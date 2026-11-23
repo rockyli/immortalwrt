@@ -49,6 +49,7 @@ jobs:
           make -j"$(nproc)" || make -j1 V=s
       - name: Verify and stage images
         run: |
+          set -euxo pipefail
           case "$BOARD" in
             UFI001C_MB_V01) profile=ufi001c ;;
             UFI003C_MB_V02) profile=ufi003 ;;
@@ -59,15 +60,33 @@ jobs:
           scripts/diffconfig.sh > "$dest/diffconfig"
           git rev-parse HEAD > "$dest/source.sha"
           cd bin/targets/msm89xx/msm8916
+          ls -lh
           for part in boot system; do
-            image="immortalwrt-msm89xx-msm8916-openstick-$profile-ext4-$part.img"
+            shopt -s nullglob
+            candidates=( *"-openstick-$profile-ext4-$part.img" *"-openstick-$profile-ext4-$part.img.gz" )
+            test "${#candidates[@]}" = 1
+            image=${candidates[0]}
             test -s "$image"
             grep -F "$image" sha256sums | sha256sum -c -
-            cp "$image" "$dest"
+            if [[ "$image" == *.gz ]]; then
+              gzip -dc "$image" > "$dest/${image%.gz}"
+            else
+              cp "$image" "$dest/"
+            fi
           done
           cp *.manifest "$dest"
+          grep -F "qcom-msm8916-modem-openstick-$profile-firmware" *.manifest
           cd "$dest"
           sha256sum *.img | tee SHA256SUMS
+      - name: Preserve image output if verification fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-diagnostics-${{ github.run_id }}
+          path: |
+            bin/targets/msm89xx/msm8916/*.img*
+            bin/targets/msm89xx/msm8916/sha256sums
+            bin/targets/msm89xx/msm8916/*.manifest
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ env.BOARD }}-${{ github.sha }}
