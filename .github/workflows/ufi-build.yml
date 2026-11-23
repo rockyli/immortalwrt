@@ -2,6 +2,9 @@ name: UFI firmware
 on:
   push:
     branches: [ufi-msm8916]
+    paths-ignore:
+      - .github/workflows/ufi-apk.yml
+      - ufi/check-apk.sh
   workflow_dispatch:
     inputs:
       board:

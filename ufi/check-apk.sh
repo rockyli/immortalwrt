@@ -13,8 +13,8 @@ for path in etc/apk lib/apk usr/lib/apk; do
 done
 mkdir -p "$root/tmp"
 cat "$root/etc/apk/repositories.d/distfeeds.list"
-# --no-scripts and --simulate avoid running target binaries or changing the image.
-args=(--root "$root" --arch aarch64_generic --no-scripts --no-cache)
+# The update and simulated add operations avoid running target binaries or changing the image.
+args=(--root "$root" --arch aarch64_generic --no-cache)
 "$apk" "${args[@]}" update || exit $?
 for package in tree nano; do
     echo "=== simulate $package ==="
