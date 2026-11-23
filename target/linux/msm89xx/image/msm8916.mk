@@ -9,6 +9,13 @@ endef
 
 define Device/openstick-ufi001c
   $(Device/msm8916)
+  ifeq ($(CONFIG_TARGET_msm89xx_msm8916_DEVICE_openstick-ufi001c)$(CONFIG_TARGET_ROOTFS_EXT4FS),yy)
+    IMAGES += sysupgrade.tar
+    IMAGE/sysupgrade.tar/ext4 := append-kernel | aboot-img | ufi-upgrade | append-metadata
+    IMAGE/system.img/ext4 := append-rootfs | ufi-check-ext4 | sparse-img | append-metadata
+    FILESYSTEMS := ext4
+    SUPPORTED_DEVICES += thwc,ufi001c
+  endif
   DEVICE_VENDOR := Zhihe
   DEVICE_MODEL := OpenStick UFI001C
   DEVICE_DTS := msm8916-thwc-ufi001c

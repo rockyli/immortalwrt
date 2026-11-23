@@ -23,6 +23,15 @@ define Build/sparse-img
 	mv $@.new $@
 endef
 
+define Build/ufi-check-ext4
+	e2fsck -fy $@ || e2fsck -fn $@
+	e2fsck -fn $@
+endef
+
+define Build/ufi-upgrade
+	bash $(TOPDIR)/ufi/pack-upgrade.sh "$@" "$(IMAGE_ROOTFS)" "$@"
+endef
+
 ### Devices ###
 define Device/Default
 	PROFILES := Default
