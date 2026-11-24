@@ -2,7 +2,7 @@ name: UFI official APK compatibility
 on:
   push:
     branches: [ufi-msm8916]
-    paths: [.github/workflows/ufi-apk.yml, ufi/check-apk.sh]
+    paths: [.github/workflows/ufi-apk.yml]
   workflow_dispatch:
 permissions:
   actions: read
@@ -20,11 +20,11 @@ jobs:
           set -euo pipefail
           artifact=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" |
             jq -er '[.artifacts[] | select(.expired == false and .workflow_run.head_branch == "ufi-msm8916" and (.name | startswith("UFI001C_MB_V01-")))] | first | select(.)')
-          jq -r '"id=\(.id)\nrun=\(.workflow_run.id)"' <<< "$artifact" >> "$GITHUB_OUTPUT"
+          jq -r '"name=\(.name)\nrun=\(.workflow_run.id)"' <<< "$artifact" >> "$GITHUB_OUTPUT"
           jq '{name,digest,workflow_run}' <<< "$artifact"
       - uses: actions/download-artifact@v4
         with:
-          artifact-ids: ${{ steps.firmware.outputs.id }}
+          name: ${{ steps.firmware.outputs.name }}
           run-id: ${{ steps.firmware.outputs.run }}
           github-token: ${{ github.token }}
           path: firmware

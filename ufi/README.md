@@ -37,3 +37,31 @@ git diff --stat a0863614715f843cea107748399b46f4e46df4b1 7fe583d96eabe34efdc2f76
 LAN 管理地址为 `192.168.4.1/24`。上网棒为 USB 和 Wi-Fi 接入的客户端分配 DHCP 地址，沿用 dnsmasq 的起点 100、数量 150，即 `192.168.4.100` 至 `192.168.4.249`。XR30 的 USB 上联网口可从该地址池取址，XR30 自己的 LAN 继续使用 `192.168.10.0/24`。
 
 默认 2.4 GHz 热点 `ImmortalWrt` 使用 WPA2-PSK，出厂密码为 `1234567890`。上述默认值在生成新配置时应用。保留配置升级的设备继续使用恢复的网络、DHCP 和无线设置。
+
+## PSG 安装前提与真机验收
+
+每个板型的构建分别检查最终 manifest 和 system.img 的 APK 安装数据库。四个模块包 tun、inet-diag、nft-tproxy、netlink-diag 均须依赖镜像内 kernel 包的精确 ABI。CI 使用镜像自带的 apk 刷新签名索引，对已固定 SHA-256 的 OpenClash 0.48.002 APK、PSG v2.4.4 依赖、ss、Tailscale 和其 LuCI 面板进行一次联合安装模拟。失败详情在对应板的 apk-compatibility.txt。ss 和 Tailscale 使用届时官方源的可解版本，报告记录实际求解结果。
+
+| 板型 | 改动前的真机软件检查 | 新版 TUN / TPROXY / OpenClash 与 Mihomo / Tailscale |
+| --- | --- | --- |
+| UFI003C_MB_V02 | 6.12.85 官方源刷新成功。OpenClash 0.48.002、Tailscale 1.104.1-r1 缺 kmod-tun，ss 6.18.0-r2 缺 kmod-netlink-diag，PSG 还要求另两个模块。 | 待刷机实测 |
+| UFI001C_MB_V01 | 尚无同项实测 | 待刷机实测 |
+
+刷入各自镜像后分别记录板型、源码提交、内核 ABI、包版本及下列结果。完成 PSG 软件安装后用 ip-full 临时创建 TUN 设备；nft 只检查事务，不添加生效规则：
+
+```sh
+cat /usr/share/ufi/pcb
+uname -r
+apk list --installed --manifest | grep -E '^(kernel|kmod-(tun|inet-diag|netlink-diag|nft-tproxy)|tailscale|ss|luci-app-openclash) '
+test -c /dev/net/tun && ip tuntap add dev psg-test0 mode tun && ip tuntap del dev psg-test0 mode tun
+nft --check -f - <<'NFT'
+table ip psg_verify_tproxy {
+    chain test {
+        type filter hook prerouting priority mangle; policy accept;
+        meta l4proto { tcp, udp } tproxy to :7893 accept
+    }
+}
+NFT
+```
+
+配置有效的 OpenClash 配置文件并启动服务后，记录 /etc/init.d/openclash status、实际核心进程（clash 或 mihomo）和监听端口（ss -lntup）。启动 Tailscale 后，记录 /etc/init.d/tailscale status 与 tailscale status --json 的 BackendState；分别标明服务是否启动、节点是否已授权上线。公开验收记录只保留结果，省略订阅、节点地址及认证信息。
