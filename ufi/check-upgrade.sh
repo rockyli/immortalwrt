@@ -39,6 +39,13 @@ gzip -dc "$tmp/payload/root.ext4.gz" > "$tmp/ext4"
 e2fsck -fn "$tmp/ext4"
 test "$(debugfs -R 'cat /usr/share/ufi/pcb' "$tmp/ext4" 2>/dev/null)" = "$pcb"
 debugfs -R 'cat /usr/share/ufi/layout-v1' "$tmp/ext4" 2>/dev/null | cmp - "$spec"
+debugfs -R 'cat /etc/board.d/99-ufi-network' "$tmp/ext4" 2>/dev/null | cmp - "$layouts/99-ufi-network"
+debugfs -R 'cat /etc/config/dhcp' "$tmp/ext4" 2>/dev/null | awk '
+    $1 == "config" { lan = ($2 == "dhcp" && $3 == "lan") }
+    lan && $1 == "option" && $2 == "start" { start = $3 }
+    lan && $1 == "option" && $2 == "limit" { limit = $3 }
+    END { exit !(start == 100 && limit == 150) }
+'
 fwtool -i "$tmp/meta" "$image"
 jq -e '.supported_devices | index("thwc,ufi001c") != null' "$tmp/meta"
 printf x >> "$tmp/payload/boot.img"
