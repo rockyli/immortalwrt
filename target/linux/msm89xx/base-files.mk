@@ -1,9 +1,15 @@
 # The two profiles share a DT compatible; identify the installed build separately.
-ifeq ($(CONFIG_TARGET_msm89xx_msm8916_DEVICE_openstick-ufi001c),y)
+ufi_profiles := $(CONFIG_TARGET_msm89xx_msm8916_DEVICE_openstick-ufi001c)$(CONFIG_TARGET_msm89xx_msm8916_DEVICE_openstick-ufi003)
+ifeq ($(ufi_profiles),yy)
+  $(error Build UFI001C and UFI003C as separate images)
+endif
+ifeq ($(ufi_profiles),y)
+ufi_pcb := $(if $(CONFIG_TARGET_msm89xx_msm8916_DEVICE_openstick-ufi003),UFI003C_MB_V02,UFI001C_MB_V01)
+ufi_layout := $(if $(CONFIG_TARGET_msm89xx_msm8916_DEVICE_openstick-ufi003),layout-ufi003c-v1,layout-v1)
 define Package/base-files/install-target
 	$(INSTALL_DIR) $(1)/usr/share/ufi $(1)/lib/upgrade
-	echo UFI001C_MB_V01 > $(1)/usr/share/ufi/pcb
-	$(INSTALL_DATA) $(PLATFORM_DIR)/ufi/layout-v1 $(1)/usr/share/ufi/layout-v1
+	echo $(ufi_pcb) > $(1)/usr/share/ufi/pcb
+	$(INSTALL_DATA) $(PLATFORM_DIR)/ufi/$(ufi_layout) $(1)/usr/share/ufi/layout-v1
 	$(INSTALL_DATA) $(PLATFORM_DIR)/ufi/platform.sh $(1)/lib/upgrade/platform.sh
 endef
 endif

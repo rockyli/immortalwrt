@@ -19,7 +19,7 @@ ufi_match_layout() {
 }
 
 ufi_identify() {
-	[ "$(cat /usr/share/ufi/pcb)" = UFI001C_MB_V01 ] &&
+	case "$(cat /usr/share/ufi/pcb)" in UFI001C_MB_V01|UFI003C_MB_V02) ;; *) return 1 ;; esac
 		[ "$(cat /tmp/sysinfo/board_name)" = thwc,ufi001c ] &&
 		grep -Eq '(^| )root=/dev/mmcblk0p14( |$)' /proc/cmdline &&
 		[ -b /dev/mmcblk0p12 ] && [ -b /dev/mmcblk0p14 ] &&
@@ -57,14 +57,14 @@ ufi_verify() (
 )
 
 platform_check_image() {
-	ufi_identify && ufi_verify "$1" UFI001C_MB_V01 quick &&
+	ufi_identify && ufi_verify "$1" "$(cat /usr/share/ufi/pcb)" quick &&
 		[ "$(awk '/^MemAvailable:/ {print $2}' /proc/meminfo)" -ge 49152 ] || return 74
 }
 
 platform_do_upgrade() {
 	set -o pipefail
 	local image="$1" mountdir=/tmp/ufi-newroot dev part control
-	ufi_identify && ufi_verify "$image" UFI001C_MB_V01 full || exit 1
+	ufi_identify && ufi_verify "$image" "$(cat /usr/share/ufi/pcb)" full || exit 1
 	awk '$2=="/" && $3=="tmpfs" {ok=1} END {exit !ok}' /proc/mounts || exit 1
 	for part in mmcblk0p12 mmcblk0p14; do
 		dev=$(cat "/sys/class/block/$part/dev") || exit 1
