@@ -25,7 +25,16 @@ sudo mount -o loop,nodev,nosuid "$work/system.ext4" "$root"
 [[ $(cat "$root/usr/share/ufi/pcb") == "$board" ]]
 
 manifest_version() {
-    awk -v p="$1" '$1 == p && $2 == "-" {v=$3; count++} END {if(count!=1) exit 1; print v}' "${manifests[0]}"
+    awk -v pkg="$1" -v board="$board" '
+        $1 == pkg && $2 == "-" && NF == 3 { version=$3; count++ }
+        END {
+            if (count != 1) {
+                printf "%s: expected one manifest entry for %s, found %d\n", board, pkg, count > "/dev/stderr"
+                exit 1
+            }
+            print version
+        }
+    ' "${manifests[0]}"
 }
 kernel=$(manifest_version kernel)
 modules=(kmod-tun kmod-inet-diag kmod-nft-tproxy kmod-netlink-diag)
@@ -43,7 +52,7 @@ check_installed() {
             if (name==pkg && version==ver && (dep=="" || index(deps," " dep " "))) found++
         }
         END {exit found!=1}
-    ' "$db" || { echo "Image database mismatch: $1 $2 $3" >&2; return 1; }
+    ' "$db" || { echo "$board: image database mismatch for $1 $2 $3" >&2; return 1; }
 }
 check_installed kernel "$kernel" ""
 echo "$board installed kernel: $kernel"
