@@ -72,15 +72,25 @@ runtime=(ucode "${runtime_libs[0]}" ucode-mod-lua luci-base luci-lua-runtime luc
 check_luci() {
     local pkg version
     [[ $(awk '/^P:libucode[0-9]+$/ {print substr($0,3)}' "$db") == "${runtime_libs[0]}" ]]
-    for pkg in "${runtime[@]}" luci-app-tailscale-community openssl-util uhttpd; do
+    for pkg in "${runtime[@]}" openssl-util uhttpd; do
         version=$(manifest_version "$pkg")
         check_installed "$pkg" "$version" ""
     done
     [[ $(guest /usr/bin/ucode -e 'print(type(require("lua")), "\n")') == object ]]
-    jq -e 'has("admin/services/tailscale") and (has("admin/vpn/tailscale") | not)' \
-        "$root/usr/share/luci/menu.d/luci-app-tailscale-community.json" >/dev/null
-    echo "$board: image package versions match, Lua bridge loads, Tailscale services menu verified"
+    echo "$board: image package versions match and the Lua bridge loads"
 }
+
+# Ensure neither the PCB profile nor a new transitive dependency brings the
+# deployment-managed applications back into the factory image.
+for pkg in tailscale luci-app-tailscale-community luci-app-openclash mihomo; do
+    if awk -v p="$pkg" '$1 == p {found=1} END {exit !found}' "${manifests[0]}" ||
+       grep -Fxq "P:$pkg" "$db"; then
+        echo "$board: factory image contains deployment-managed package $pkg" >&2
+        exit 1
+    fi
+done
+core=$(sudo find "$root" -xdev \( -type f -o -type l \) \( -name clash_meta -o -name mihomo \) -print -quit)
+[[ -z "$core" ]] || { echo "$board: factory image contains ${core#"$root"}" >&2; exit 1; }
 
 check_luci
 [[ -s "$root/lib/libustream-ssl.so" && -x "$root/usr/bin/openssl" ]]
@@ -114,4 +124,12 @@ sudo "$PWD/staging_dir/host/bin/apk" --root "$root" --arch aarch64_generic add \
 check_luci
 [[ -s "$root/usr/lib/lua/luci/controller/openclash.lua" ]]
 [[ -s "$root/usr/share/rpcd/acl.d/luci-app-openclash.json" ]]
-echo "$board: OpenClash controller installed and Lua bridge still loads after PSG packages"
+for pkg in tailscale luci-app-tailscale-community luci-app-openclash; do
+    guest_apk info -e "$pkg"
+done
+ts_cli=$(sudo find "$root/usr" \( -type f -o -type l \) -name tailscale -print -quit)
+[[ -n "$ts_cli" ]]
+guest "${ts_cli#"$root"}" version
+menu="$root/usr/share/luci/menu.d/luci-app-tailscale-community.json"
+jq -er 'keys[] | select(endswith("/tailscale"))' "$menu"
+echo "$board: PSG applications installed in the test copy and the Lua bridge still loads"
