@@ -1,7 +1,7 @@
-name: UFI firmware
+name: UFI firmware · 25.12.2 candidate
 on:
   push:
-    branches: [ufi-msm8916]
+    branches: [ufi-v25.12.2]
     paths-ignore:
       - .github/workflows/ufi-apk.yml
   workflow_dispatch:
@@ -9,17 +9,18 @@ on:
       board:
         description: PCB
         type: choice
-        options: [UFI001C_MB_V01, UFI003C_MB_V02]
-        default: UFI001C_MB_V01
+        options: [both, UFI001C_MB_V01, UFI003C_MB_V02]
+        default: both
 permissions:
   contents: read
 jobs:
   firmware:
-    name: Build ${{ matrix.board }}
+    name: 25.12.2 · ${{ matrix.board }}
+    if: github.ref == 'refs/heads/ufi-v25.12.2'
     strategy:
       fail-fast: false
       matrix:
-        board: ${{ fromJSON(inputs.board && format('["{0}"]', inputs.board) || '["UFI001C_MB_V01","UFI003C_MB_V02"]') }}
+        board: ${{ fromJSON(inputs.board && inputs.board != 'both' && format('["{0}"]', inputs.board) || '["UFI001C_MB_V01","UFI003C_MB_V02"]') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 330
     env:
@@ -110,7 +111,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: image-diagnostics-${{ matrix.board }}-${{ github.run_id }}
+          name: ufi-25.12.2-diagnostics-${{ matrix.board }}-${{ github.run_id }}
           path: |
             bin/targets/msm89xx/msm8916/*.img*
             bin/targets/msm89xx/msm8916/*sysupgrade.tar*
@@ -119,6 +120,6 @@ jobs:
             artifacts/*/apk-compatibility.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.BOARD }}-${{ github.sha }}
+          name: ufi-25.12.2-${{ env.BOARD }}-${{ github.sha }}
           path: artifacts/
           include-hidden-files: true

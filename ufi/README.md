@@ -22,7 +22,7 @@ git diff --stat a0863614715f843cea107748399b46f4e46df4b1 7fe583d96eabe34efdc2f76
 
 ## 构建与更新
 
-向 ufi-msm8916 推送代码会分别编译两块 PCB。工作流设有两板选择输入；GitHub 网页的手动触发入口要求该工作流也存在于默认分支。构建校验配置及 boot/system 镜像的哈希，保留 manifest、完整配置、diffconfig、feeds 和源码版本。CI 对每块板单独检查三项无线固件包及升级包。
+向 `ufi-v25.12.2` 推送会启动独立的 `UFI firmware · 25.12.2 candidate` 工作流，同时构建两块 PCB。此候选的制品名称含 `ufi-25.12.2`、板型及源码 SHA。稳定维护分支 `ufi-msm8916` 继续使用 `UFI firmware`。构建校验配置及 boot/system 镜像的哈希，保留 manifest、完整配置、diffconfig、feeds 和源码版本。CI 对每块板单独检查三项无线固件包及升级包。
 
 同步官方更新时，先从已验收提交建立候选分支，合入选定官方提交，审查上述板级差异，按需要成组更新 feeds。构建、启动、USB 管理、Wi-Fi、蜂窝注册和数据通信逐项记录。单臂旁路脚本作为系统启动后的配置阶段独立验收。
 
