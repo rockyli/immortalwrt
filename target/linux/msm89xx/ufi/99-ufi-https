@@ -1,0 +1,8 @@
+#!/bin/sh
+# Keep explicit listen addresses when upgrading with saved configuration.
+[ -n "$(uci -q get uhttpd.main.listen_https)" ] && exit 0
+uci batch <<'UCI'
+add_list uhttpd.main.listen_https='0.0.0.0:443'
+add_list uhttpd.main.listen_https='[::]:443'
+commit uhttpd
+UCI

@@ -40,7 +40,7 @@ LAN 管理地址为 `192.168.4.1/24`。上网棒为 USB 和 Wi-Fi 接入的客�
 
 ## PSG 安装前提与真机验收
 
-每个板型的构建分别检查最终 manifest 和 system.img 的 APK 安装数据库。四个模块包 tun、inet-diag、nft-tproxy、netlink-diag 均须依赖镜像内 kernel 包的精确 ABI。CI 使用镜像自带的 apk 刷新签名索引，对已固定 SHA-256 的 OpenClash 0.48.002 APK、PSG v2.4.4 依赖、ss、Tailscale 和其 LuCI 面板进行一次联合安装模拟。失败详情在对应板的 apk-compatibility.txt。ss 和 Tailscale 使用届时官方源的可解版本，报告记录实际求解结果。
+每个板型的构建分别检查最终 manifest 和 system.img 的 APK 安装数据库。四个模块包 tun、inet-diag、nft-tproxy、netlink-diag 均须依赖镜像内 kernel 包的精确 ABI。CI 使用镜像自带的 apk 刷新签名索引，对已固定 SHA-256 的 OpenClash 0.48.002 APK、PSG v2.4.5 依赖、ss、Tailscale 和其 LuCI 面板进行一次联合安装模拟。失败详情在对应板的 apk-compatibility.txt。ss 和 Tailscale 使用届时官方源的可解版本，报告记录实际求解结果。
 
 | 板型 | 改动前的真机软件检查 | 新版 TUN / TPROXY / OpenClash 与 Mihomo / Tailscale |
 | --- | --- | --- |
@@ -65,3 +65,30 @@ NFT
 ```
 
 配置有效的 OpenClash 配置文件并启动服务后，记录 /etc/init.d/openclash status、实际核心进程（clash 或 mihomo）和监听端口（ss -lntup）。启动 Tailscale 后，记录 /etc/init.d/tailscale status 与 tailscale status --json 的 BackendState；分别标明服务是否启动、节点是否已授权上线。公开验收记录只保留结果，省略订阅、节点地址及认证信息。
+
+## LuCI、OpenClash 和 HTTPS 的新版验收
+
+两块板使用同一源码提交和 `ufi/feeds.conf` 锁定的 feeds，在构建时配套安装 ucode、libucode、ucode-mod-lua、luci-base、luci-lua-runtime、luci-compat。Tailscale 面板采用此快照的「服务」菜单。CI 在每块板的 system.img 副本上加载 Lua 模块，再安装 PSG v2.4.5 的依赖、面板和固定版本的 OpenClash APK，复查包版本和模块加载。该安装跳过包脚本；登录、服务状态和网络访问按下表在硬件上验收。
+
+uHTTPd 首次启动时通过设备自身的随机源生成密钥和自签证书。首次连接请从设备本地核对证书指纹。已有监听地址和已有证书可随保留配置升级恢复。请在干净首次启动的两台设备上做证书独立性检查。
+
+| 板型 | 此前真机结果 | 新版首次启动 | 部署 PSG v2.4.5 后 | 重启后 |
+| --- | --- | --- | --- | --- |
+| UFI001C_MB_V01 | 核心正常，Lua ABI 不匹配使菜单缺失。原镜像仅 HTTP；手动补装和配置后 HTTPS 可用。 | 待验 | 待验 | 待验 |
+| UFI003C_MB_V02 | 本项待独立验证 | 待验 | 待验 | 待验 |
+
+每阶段记录板型和固件提交，执行以下检查。期望 Lua 输出 `object`，回环 HTTPS 返回 2xx 或 3xx。首次启动时若尚无 curl，可在设备上用 `openssl s_client`，配合下方命令读取 HTTP 状态行。
+
+```sh
+cat /usr/share/ufi/pcb
+ucode -e 'print(type(require("lua")), "\n")'
+printf 'GET / HTTP/1.0\r\nHost: localhost\r\nConnection: close\r\n\r\n' |
+    openssl s_client -quiet -connect 127.0.0.1:443 2>/dev/null | head -n 1
+openssl x509 -inform DER -in /etc/uhttpd.crt -noout -fingerprint -sha256
+openssl x509 -inform DER -in /etc/uhttpd.crt -pubkey -noout | sha256sum
+```
+
+1. 比较两板的证书指纹和公钥摘要，应分别不同；同一板重启前后应相同。保留私钥在设备本地。
+2. 首次启动及重启后，从 LAN 客户端通过 `https://192.168.4.1/` 进入 LuCI 登录页。
+3. 部署 PSG 并启用有效的 OpenClash 配置后，用已登录会话打开「服务 → OpenClash」，确认概览显示 Mihomo 正在运行；检查同级 Tailscale 面板可打开。用获准的 Tailnet 客户端经设备 Tailnet 地址访问 HTTPS 登录页，重启后复测两面板及 Tailnet。
+4. 每阶段核对生效的防火墙规则，确认蜂窝接口归属 WAN，WAN 入站拒绝且无管理端口放行。使用能到达该 WAN 的外部测试端验证 TCP 80/443 无法访问（同时覆盖可用的 IPv4 和 IPv6）；用 WAN 入站计数或抓包确认探测确实抵达设备。运营商 NAT 导致的不可达单独记录为外部探测未验证。

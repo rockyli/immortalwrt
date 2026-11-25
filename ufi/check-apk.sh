@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Validate the final system image on a disposable runner, without installing any APK.
+# Validate the final system image and its PSG dependencies on a disposable, unpacked image copy.
 set -euo pipefail
 dest=$1
 board=$2
@@ -61,13 +61,57 @@ sudo cp "$work/$apk_name" /usr/bin/qemu-aarch64-static "$root/tmp/"
 sudo cp --remove-destination -L /etc/resolv.conf "$root/etc/resolv.conf"
 apk=$(sudo find "$root" -type f -name apk -print -quit)
 test -n "$apk"
-guest_apk() { sudo chroot "$root" /tmp/qemu-aarch64-static "${apk#"$root"}" "$@"; }
+guest() { sudo chroot "$root" /tmp/qemu-aarch64-static "$@"; }
+guest_apk() { guest "${apk#"$root"}" "$@"; }
+
+# Derive the ABI-suffixed package names from this image so the gate also
+# catches missing or multiple ABI generations when updating the pinned feeds.
+mapfile -t runtime_libs < <(awk '$1 ~ /^libucode[0-9]+$/ {print $1}' "${manifests[0]}")
+[[ ${#runtime_libs[@]} == 1 ]]
+runtime=(ucode "${runtime_libs[0]}" ucode-mod-lua luci-base luci-lua-runtime luci-compat)
+check_luci() {
+    local pkg version
+    [[ $(awk '/^P:libucode[0-9]+$/ {print substr($0,3)}' "$db") == "${runtime_libs[0]}" ]]
+    for pkg in "${runtime[@]}" luci-app-tailscale-community openssl-util uhttpd; do
+        version=$(manifest_version "$pkg")
+        check_installed "$pkg" "$version" ""
+    done
+    [[ $(guest /usr/bin/ucode -e 'print(type(require("lua")), "\n")') == object ]]
+    jq -e 'has("admin/services/tailscale") and (has("admin/vpn/tailscale") | not)' \
+        "$root/usr/share/luci/menu.d/luci-app-tailscale-community.json" >/dev/null
+    echo "$board: image package versions match, Lua bridge loads, Tailscale services menu verified"
+}
+
+check_luci
+[[ -s "$root/lib/libustream-ssl.so" && -x "$root/usr/bin/openssl" ]]
+for file in /etc/uhttpd.key /etc/uhttpd.crt; do
+    [[ ! -e "$root$file" && ! -L "$root$file" ]]
+done
+# Apply the board default to the disposable root via its own UCI binary.
+uci() { guest /sbin/uci "$@"; }
+( . "$root/etc/uci-defaults/99-ufi-https" )
+listeners=$(uci get uhttpd.main.listen_https)
+for addr in '0.0.0.0:443' '[::]:443'; do
+    [[ " $listeners " == *" $addr "* ]]
+done
 cat "$root/etc/apk/repositories.d/distfeeds.list"
 guest_apk --version
 guest_apk update
 for pkg in tree nano; do guest_apk add --simulate "$pkg"; done
 
-# PSG v2.4.4 step 20 plus its Tailscale and LuCI stages. Pin the installed kernel ABI.
+# PSG v2.4.5 step 20 plus its Tailscale and LuCI stages. Pin the installed kernel ABI.
 deps=(bash dnsmasq-full curl ca-bundle ip-full ruby ruby-yaml unzip luci-compat luci luci-base ss
       tailscale luci-app-tailscale-community)
-guest_apk add --simulate --allow-untrusted "/tmp/$apk_name" "kernel=$kernel" "${modules[@]}" "${deps[@]}"
+transaction=(--allow-untrusted "/tmp/$apk_name" "kernel=$kernel" "${modules[@]}" "${deps[@]}")
+guest_apk add --simulate "${transaction[@]}"
+# Exercise actual installed libraries after dependency resolution. Device service
+# setup, authentication and firewall behavior are verified on the boards.
+# The runner builds the full host apk alongside the minimal target apk.
+# Suppress package scripts on the runner while applying the same request.
+sudo "$PWD/staging_dir/host/bin/apk" --root "$root" --arch aarch64_generic add \
+    --no-scripts --no-commit-hooks --allow-untrusted "$work/$apk_name" \
+    "kernel=$kernel" "${modules[@]}" "${deps[@]}"
+check_luci
+[[ -s "$root/usr/lib/lua/luci/controller/openclash.lua" ]]
+[[ -s "$root/usr/share/rpcd/acl.d/luci-app-openclash.json" ]]
+echo "$board: OpenClash controller installed and Lua bridge still loads after PSG packages"
