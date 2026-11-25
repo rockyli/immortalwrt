@@ -42,24 +42,28 @@ define Device/rk3576
   SOC := rk3576
   KERNEL_LOADADDR := 0x43000000
   BOOT_FLOW := pine64-img
+  DEVICE_PACKAGES := kmod-phy-rockchip-usbdp
 endef
 
 define Device/rk3582
   SOC := rk3582
   KERNEL_LOADADDR := 0x03000000
   BOOT_FLOW := pine64-img
+  DEVICE_PACKAGES := kmod-phy-rockchip-usbdp
 endef
 
 define Device/rk3588
   SOC := rk3588
   KERNEL_LOADADDR := 0x03000000
   BOOT_FLOW := pine64-img
+  DEVICE_PACKAGES := kmod-phy-rockchip-usbdp
 endef
 
 define Device/rk3588s
   SOC := rk3588s
   KERNEL_LOADADDR := 0x03000000
   BOOT_FLOW := pine64-img
+  DEVICE_PACKAGES := kmod-phy-rockchip-usbdp
 endef
 
 define Device/IfnameMigration
@@ -75,7 +79,7 @@ define Device/9tripod_x3568-v4
   DEVICE_DTS := rk3568-9tripod-x3568-v4
   SUPPORTED_DEVICES := ninetripod,x3568-v4
   DEVICE_PACKAGES := blkdiscard block-mount kmod-ata-ahci-dwc kmod-nvme kmod-hwmon-pwmfan \
-	kmod-input-adc-keys kmod-saradc-rockchip kmod-rtc-pcf8563 kmod-brcmfmac wpad-openssl \
+	kmod-input-adc-keys kmod-rtc-pcf8563 kmod-brcmfmac wpad-openssl \
 	brcmfmac-firmware-43752-sdio brcmfmac-nvram-43752-sdio
   UBOOT_DEVICE_NAME := 9tripod-x3568-v4-rk3568
 endef
@@ -94,7 +98,7 @@ define Device/ariaboard_photonicat2
   $(Device/rk3576)
   DEVICE_VENDOR := Ariaboard
   DEVICE_MODEL := Photonicat2
-  DEVICE_PACKAGES := kmod-photonicat-pm kmod-aic8800-usb wpad-openssl kmod-usb-net-cdc-mbim \
+  DEVICE_PACKAGES += kmod-photonicat-pm kmod-aic8800-usb wpad-openssl kmod-usb-net-cdc-mbim \
 	kmod-usb-net-qmi-wwan kmod-usb-serial-option uqmi
 endef
 TARGET_DEVICES += ariaboard_photonicat2
@@ -116,7 +120,7 @@ define Device/armsom_sige7
   DEVICE_ALT0_VENDOR := Bananapi
   DEVICE_ALT0_MODEL := BPi-M7
   DEVICE_DTS := rk3588-armsom-sige7
-  DEVICE_PACKAGES := kmod-brcmfmac kmod-r8125 wpad-openssl \
+  DEVICE_PACKAGES += kmod-brcmfmac kmod-r8125 wpad-openssl \
 	brcmfmac-firmware-43752-pcie brcmfmac-nvram-43752-pcie
 endef
 TARGET_DEVICES += armsom_sige7
@@ -125,7 +129,7 @@ define Device/cyber_cyber3588-aib
   $(Device/rk3588)
   DEVICE_VENDOR := Cyber
   DEVICE_MODEL := 3588 AIB
-  DEVICE_PACKAGES := kmod-ata-ahci-dwc kmod-r8125 kmod-mt7921e wpad-openssl \
+  DEVICE_PACKAGES += kmod-ata-ahci-dwc kmod-r8125 kmod-mt7921e wpad-openssl \
 	kmod-hwmon-pwmfan kmod-usb-net-cdc-mbim kmod-usb-net-qmi-wwan \
 	kmod-usb-serial-option uqmi
 endef
@@ -167,7 +171,8 @@ define Device/friendlyarm_nanopc-t4
   DEVICE_VENDOR := FriendlyARM
   DEVICE_MODEL := NanoPC T4
   DEVICE_PACKAGES := kmod-brcmfmac wpad-openssl \
-	brcmfmac-firmware-4356-sdio brcmfmac-nvram-4356-sdio
+	brcmfmac-firmware-4356-sdio brcmfmac-nvram-4356-sdio \
+	kmod-button-hotplug kmod-input-adc-keys
 endef
 TARGET_DEVICES += friendlyarm_nanopc-t4
 
@@ -175,9 +180,17 @@ define Device/friendlyarm_nanopc-t6
   $(Device/rk3588)
   DEVICE_VENDOR := FriendlyARM
   DEVICE_MODEL := NanoPC T6
-  DEVICE_PACKAGES := kmod-r8125
+  DEVICE_PACKAGES += kmod-button-hotplug kmod-input-adc-keys kmod-r8125
 endef
 TARGET_DEVICES += friendlyarm_nanopc-t6
+
+define Device/friendlyarm_nanopi-m5
+  $(Device/rk3576)
+  DEVICE_VENDOR := FriendlyARM
+  DEVICE_MODEL := NanoPi M5
+  DEVICE_PACKAGES += blkdiscard block-mount kmod-button-hotplug kmod-input-adc-keys kmod-nvme
+endef
+TARGET_DEVICES += friendlyarm_nanopi-m5
 
 define Device/friendlyarm_nanopi-r2c
   $(Device/rk3328)
@@ -202,6 +215,14 @@ define Device/friendlyarm_nanopi-r2s
   DEVICE_PACKAGES := kmod-usb-net-rtl8152
 endef
 TARGET_DEVICES += friendlyarm_nanopi-r2s
+
+define Device/friendlyarm_nanopi-r2s-plus
+  $(Device/rk3328)
+  DEVICE_VENDOR := FriendlyARM
+  DEVICE_MODEL := NanoPi R2S Plus
+  DEVICE_PACKAGES := kmod-usb-net-rtl8152
+endef
+TARGET_DEVICES += friendlyarm_nanopi-r2s-plus
 
 define Device/friendlyarm_nanopi-r3s
   $(Device/rk3566)
@@ -240,7 +261,7 @@ define Device/friendlyarm_nanopi-r5c
   $(Device/rk3568)
   DEVICE_VENDOR := FriendlyARM
   DEVICE_MODEL := NanoPi R5C
-  DEVICE_PACKAGES := kmod-r8125 kmod-rtw88-8822ce rtl8822ce-firmware wpad-openssl
+  DEVICE_PACKAGES := kmod-button-hotplug kmod-input-adc-keys kmod-r8125 kmod-rtw88-8822ce rtl8822ce-firmware wpad-openssl
 endef
 TARGET_DEVICES += friendlyarm_nanopi-r5c
 
@@ -248,7 +269,7 @@ define Device/friendlyarm_nanopi-r5s
   $(Device/rk3568)
   DEVICE_VENDOR := FriendlyARM
   DEVICE_MODEL := NanoPi R5S
-  DEVICE_PACKAGES := kmod-r8125
+  DEVICE_PACKAGES := kmod-button-hotplug kmod-input-adc-keys kmod-r8125
 endef
 TARGET_DEVICES += friendlyarm_nanopi-r5s
 
@@ -256,7 +277,7 @@ define Device/friendlyarm_nanopi-r6c
   $(Device/rk3588s)
   DEVICE_VENDOR := FriendlyARM
   DEVICE_MODEL := NanoPi R6C
-  DEVICE_PACKAGES := kmod-r8125
+  DEVICE_PACKAGES += kmod-button-hotplug kmod-input-adc-keys kmod-r8125
 endef
 TARGET_DEVICES += friendlyarm_nanopi-r6c
 
@@ -264,7 +285,7 @@ define Device/friendlyarm_nanopi-r6s
   $(Device/rk3588s)
   DEVICE_VENDOR := FriendlyARM
   DEVICE_MODEL := NanoPi R6S
-  DEVICE_PACKAGES := kmod-r8125
+  DEVICE_PACKAGES += kmod-button-hotplug kmod-input-adc-keys kmod-r8125
 endef
 TARGET_DEVICES += friendlyarm_nanopi-r6s
 
@@ -272,10 +293,30 @@ define Device/friendlyarm_nanopi-r76s
   $(Device/rk3576)
   DEVICE_VENDOR := FriendlyARM
   DEVICE_MODEL := NanoPi R76S
-  UBOOT_DEVICE_NAME := generic-rk3576
-  DEVICE_PACKAGES := kmod-r8125 kmod-rtw88-8822cs wpad-openssl
+  DEVICE_PACKAGES += kmod-button-hotplug kmod-input-adc-keys kmod-r8125 kmod-rtw88-8822cs wpad-openssl
 endef
 TARGET_DEVICES += friendlyarm_nanopi-r76s
+
+define Device/friendlyarm_nanopi-zero2
+  $(Device/rk3528)
+  DEVICE_VENDOR := FriendlyARM
+  DEVICE_MODEL := NanoPi Zero2
+  DEVICE_PACKAGES := kmod-rtw88-8822ce wpad-openssl
+endef
+TARGET_DEVICES += friendlyarm_nanopi-zero2
+
+define Device/graperain_g3568-v2
+  $(Device/rk3568)
+  DEVICE_VENDOR := Graperain
+  DEVICE_MODEL := G3568
+  DEVICE_VARIANT := v2
+  DEVICE_DTS := rk3568-graperain-g3568-v2
+  DEVICE_PACKAGES := blkdiscard block-mount kmod-ata-ahci-dwc kmod-nvme kmod-hwmon-pwmfan \
+	kmod-input-adc-keys kmod-rtc-pcf8563 kmod-brcmfmac wpad-openssl \
+	brcmfmac-firmware-4356-sdio brcmfmac-nvram-4356-sdio
+  UBOOT_DEVICE_NAME := graperain-g3568-v2-rk3568
+endef
+TARGET_DEVICES += graperain_g3568-v2
 
 define Device/huake_guangmiao-g4c
   $(Device/rk3399)
@@ -289,7 +330,7 @@ define Device/linkease_easepi-r1
   $(Device/rk3568)
   DEVICE_VENDOR := LinkEase
   DEVICE_MODEL := EasePi R1
-  DEVICE_PACKAGES := blkdiscard block-mount kmod-button-hotplug kmod-nvme kmod-r8125
+  DEVICE_PACKAGES := blkdiscard block-mount kmod-button-hotplug kmod-input-adc-keys kmod-nvme kmod-r8125
 endef
 TARGET_DEVICES += linkease_easepi-r1
 
@@ -334,7 +375,7 @@ define Device/nlnet_xiguapi-v3
   $(Device/rk3568)
   DEVICE_VENDOR := NLnet
   DEVICE_MODEL := XiGuaPi V3
-  DEVICE_PACKAGES := kmod-hwmon-pwmfan kmod-input-adc-keys kmod-saradc-rockchip
+  DEVICE_PACKAGES := kmod-hwmon-pwmfan kmod-input-adc-keys
 endef
 TARGET_DEVICES += nlnet_xiguapi-v3
 
@@ -368,7 +409,7 @@ define Device/radxa_e20c
   DEVICE_MODEL := E20C
   DEVICE_DTS := rk3528-radxa-e20c
   UBOOT_DEVICE_NAME := radxa-e20c-rk3528
-  DEVICE_PACKAGES := kmod-r8169
+  DEVICE_PACKAGES := kmod-button-hotplug kmod-input-adc-keys kmod-r8169
 endef
 TARGET_DEVICES += radxa_e20c
 
@@ -389,7 +430,7 @@ define Device/radxa_e52c
   DEVICE_MODEL := E52C
   DEVICE_DTS := rk3582-radxa-e52c
   UBOOT_DEVICE_NAME := generic-rk3588
-  DEVICE_PACKAGES := blkdiscard kmod-r8125
+  DEVICE_PACKAGES += blkdiscard kmod-button-hotplug kmod-input-adc-keys kmod-r8125
   DEVICE_COMPAT_VERSION := 1.1
   DEVICE_COMPAT_MESSAGE := Network interface names have been changed
 endef
@@ -400,6 +441,7 @@ define Device/radxa_rock-2a
   DEVICE_VENDOR := Radxa
   DEVICE_MODEL := ROCK 2A
   UBOOT_DEVICE_NAME := rock-2-rk3528
+  DEVICE_PACKAGES := kmod-button-hotplug kmod-input-adc-keys
 endef
 TARGET_DEVICES += radxa_rock-2a
 
@@ -408,6 +450,7 @@ define Device/radxa_rock-2f
   DEVICE_VENDOR := Radxa
   DEVICE_MODEL := ROCK 2F
   UBOOT_DEVICE_NAME := rock-2-rk3528
+  DEVICE_PACKAGES := kmod-button-hotplug kmod-input-adc-keys
 endef
 TARGET_DEVICES += radxa_rock-2f
 
@@ -461,7 +504,8 @@ define Device/radxa_rock-5-itx
   $(Device/rk3588)
   DEVICE_VENDOR := Radxa
   DEVICE_MODEL := ROCK 5 ITX/ITX+
-  DEVICE_PACKAGES := blkdiscard block-mount kmod-ata-ahci kmod-hwmon-pwmfan kmod-nvme kmod-r8125 kmod-rtw89-8852be wpad-openssl
+  DEVICE_PACKAGES += blkdiscard block-mount kmod-ata-ahci kmod-button-hotplug \
+	kmod-hwmon-pwmfan kmod-input-adc-keys kmod-nvme kmod-r8125 kmod-rtw89-8852be wpad-openssl
 endef
 TARGET_DEVICES += radxa_rock-5-itx
 
@@ -470,7 +514,7 @@ define Device/radxa_rock-5a
   DEVICE_VENDOR := Radxa
   DEVICE_MODEL := ROCK 5A
   UBOOT_DEVICE_NAME := rock5a-rk3588s
-  DEVICE_PACKAGES := blkdiscard block-mount kmod-ata-ahci kmod-hwmon-pwmfan kmod-nvme kmod-r8125 kmod-rtw89-8852be wpad-openssl
+  DEVICE_PACKAGES += blkdiscard block-mount kmod-ata-ahci kmod-hwmon-pwmfan kmod-nvme kmod-r8125 kmod-rtw89-8852be wpad-openssl
 endef
 TARGET_DEVICES += radxa_rock-5a
 
@@ -479,7 +523,7 @@ define Device/radxa_rock-5b
   DEVICE_VENDOR := Radxa
   DEVICE_MODEL := ROCK 5B
   UBOOT_DEVICE_NAME := rock5b-rk3588
-  DEVICE_PACKAGES := blkdiscard block-mount kmod-hwmon-pwmfan kmod-nvme kmod-r8125 kmod-rtw89-8852be wpad-openssl
+  DEVICE_PACKAGES += blkdiscard block-mount kmod-hwmon-pwmfan kmod-nvme kmod-r8125 kmod-rtw89-8852be wpad-openssl
 endef
 TARGET_DEVICES += radxa_rock-5b
 
@@ -489,7 +533,7 @@ define Device/radxa_rock-5b-plus
   DEVICE_MODEL := ROCK 5B+
   DEVICE_DTS := rk3588-rock-5b-plus
   UBOOT_DEVICE_NAME := generic-rk3588
-  DEVICE_PACKAGES := blkdiscard block-mount kmod-hwmon-pwmfan kmod-nvme kmod-r8125 kmod-rtw89-8852be wpad-openssl
+  DEVICE_PACKAGES += blkdiscard block-mount kmod-hwmon-pwmfan kmod-nvme kmod-r8125 kmod-rtw89-8852be wpad-openssl
 endef
 TARGET_DEVICES += radxa_rock-5b-plus
 
@@ -497,7 +541,7 @@ define Device/radxa_rock-5c
   $(Device/rk3588s)
   DEVICE_VENDOR := Radxa
   DEVICE_MODEL := ROCK 5C/5C Lite
-  DEVICE_PACKAGES := blkdiscard block-mount kmod-ata-ahci kmod-hwmon-pwmfan kmod-nvme kmod-r8125
+  DEVICE_PACKAGES += blkdiscard block-mount kmod-ata-ahci kmod-hwmon-pwmfan kmod-nvme kmod-r8125
 endef
 TARGET_DEVICES += radxa_rock-5c
 
@@ -507,7 +551,7 @@ define Device/radxa_rock-5t
   DEVICE_MODEL := ROCK 5T
   DEVICE_DTS := rk3588-rock-5t
   UBOOT_DEVICE_NAME := generic-rk3588
-  DEVICE_PACKAGES := blkdiscard block-mount iwlwifi-firmware-ax210 kmod-hwmon-pwmfan kmod-iwlwifi kmod-nvme kmod-r8125 wpad-openssl
+  DEVICE_PACKAGES += blkdiscard block-mount iwlwifi-firmware-ax210 kmod-hwmon-pwmfan kmod-iwlwifi kmod-nvme kmod-r8125 wpad-openssl
 endef
 TARGET_DEVICES += radxa_rock-5t
 
@@ -529,7 +573,8 @@ define Device/radxa_rock-pi-e
   DEVICE_ALT0_VENDOR := Radxa
   DEVICE_ALT0_MODEL := ROCK Pi E v3.0
   SUPPORTED_DEVICES := radxa,rockpi-e
-  DEVICE_PACKAGES := kmod-rtw88-8723du kmod-rtw88-8821cu kmod-usb-net-cdc-ncm kmod-usb-net-rndis wpad-openssl
+  DEVICE_PACKAGES := kmod-button-hotplug kmod-input-adc-keys kmod-rtw88-8723du kmod-rtw88-8821cu \
+	kmod-usb-net-cdc-ncm kmod-usb-net-rndis wpad-openssl
 endef
 TARGET_DEVICES += radxa_rock-pi-e
 
@@ -599,7 +644,7 @@ define Device/xunlong_orangepi-5-plus
   $(Device/rk3588)
   DEVICE_VENDOR := Xunlong
   DEVICE_MODEL := Orange Pi 5 Plus
-  DEVICE_PACKAGES := kmod-r8125
+  DEVICE_PACKAGES += kmod-r8125
 endef
 TARGET_DEVICES += xunlong_orangepi-5-plus
 

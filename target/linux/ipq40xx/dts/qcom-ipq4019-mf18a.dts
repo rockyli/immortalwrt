@@ -14,8 +14,6 @@
 	compatible = "zte,mf18a";
 
 	aliases {
-		// TODO: Verify if the ethernet0 alias is needed
-		ethernet0 = &gmac;
 		led-boot = &led_power;
 		led-failsafe = &led_power;
 		led-running = &led_power;
@@ -135,10 +133,6 @@
 	status = "okay";
 };
 
-&crypto {
-	status = "okay";
-};
-
 &blsp_dma {
 	status = "okay";
 };
@@ -217,10 +211,6 @@
 	status = "okay";
 };
 
-&cryptobam {
-	status = "okay";
-};
-
 &mdio {
 	status = "okay";
 	pinctrl-0 = <&mdio_pins>;
@@ -231,6 +221,7 @@
 
 &gmac {
 	status = "okay";
+
 	nvmem-cell-names = "mac-address";
 	nvmem-cells = <&macaddr_config_0 0>;
 };
@@ -345,6 +336,7 @@
 			partition@1800000 {
 				label = "rootfs";
 				reg = <0x1800000 0x1d00000>;
+				linux,rootfs;
 			};
 
 			partition@3500000 {
@@ -461,7 +453,7 @@
 	status = "okay";
 	nvmem-cell-names = "pre-calibration", "mac-address";
 	nvmem-cells = <&precal_art_1000>, <&macaddr_config_0 2>;
-	qcom,ath10k-calibration-variant = "ZTE-MF18A";
+	qcom,calibration-variant = "ZTE-MF18A";
 };
 
 //* This node is used for 5Ghz on QCA9982 */
@@ -478,6 +470,6 @@
 		reg = <0x00010000 0 0 0 0>;
 		nvmem-cell-names = "pre-calibration", "mac-address";
 		nvmem-cells = <&precal_art_9000>, <&macaddr_config_0 3>;
-		qcom,ath10k-calibration-variant = "ZTE-MF18A";
+		qcom,calibration-variant = "ZTE-MF18A";
 	};
 };

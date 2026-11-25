@@ -41,12 +41,11 @@
 	};
 
 	aliases {
-		// TODO: Verify if the ethernet0 alias is needed
-		ethernet0 = &gmac;
 		led-boot = &power;
 		led-failsafe = &power;
 		led-running = &power;
 		led-upgrade = &power;
+		label-mac-device = &gmac;
 	};
 
 	leds {
@@ -86,10 +85,6 @@
 };
 
 &prng {
-	status = "okay";
-};
-
-&crypto {
 	status = "okay";
 };
 
@@ -223,10 +218,6 @@
 	status = "okay";
 };
 
-&cryptobam {
-	status = "okay";
-};
-
 &switch {
 	status = "okay";
 };
@@ -238,12 +229,13 @@
 &swport5 {
 	status = "okay";
 	label = "lan";
-	nvmem-cell-names = "mac-address";
-	nvmem-cells = <&macaddr_ubootenv_ethaddr 0>;
 };
 
 &gmac {
 	status = "okay";
+
+	nvmem-cell-names = "mac-address";
+	nvmem-cells = <&macaddr_ubootenv_ethaddr 0>;
 };
 
 &mdio {
@@ -254,12 +246,12 @@
 	status = "okay";
 	nvmem-cell-names = "pre-calibration", "mac-address";
 	nvmem-cells = <&precal_art_1000>, <&macaddr_ubootenv_ethaddr 1>;
-	qcom,ath10k-calibration-variant = "EnGenius-EAP1300";
+	qcom,calibration-variant = "EnGenius-EAP1300";
 };
 
 &wifi1 {
 	status = "okay";
 	nvmem-cell-names = "pre-calibration", "mac-address";
 	nvmem-cells = <&precal_art_5000>, <&macaddr_ubootenv_ethaddr 2>;
-	qcom,ath10k-calibration-variant = "EnGenius-EAP1300";
+	qcom,calibration-variant = "EnGenius-EAP1300";
 };

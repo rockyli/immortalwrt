@@ -181,6 +181,7 @@
 			partition@600000 {
 				label = "rootfs";
 				reg = <0x0600000 0x4a00000>;
+				linux,rootfs;
 			};
 
 			partition@5000000 {
@@ -311,14 +312,14 @@
 
 &wifi0 {
 	status = "okay";
-	qcom,ath10k-calibration-variant = "linksys-whw01-v1";
+	qcom,calibration-variant = "linksys-whw01-v1";
 	nvmem-cell-names = "pre-calibration";
 	nvmem-cells = <&precal_art_1000>;
 };
 
 &wifi1 {
 	status = "okay";
-	qcom,ath10k-calibration-variant = "linksys-whw01-v1";
+	qcom,calibration-variant = "linksys-whw01-v1";
 	nvmem-cell-names = "pre-calibration";
 	nvmem-cells = <&precal_art_5000>;
 };

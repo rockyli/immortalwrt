@@ -11,11 +11,6 @@
 / {
 	model = "Qxwlan E2600AC c2";
 	compatible = "qxwlan,e2600ac-c2";
-
-	aliases {
-		// TODO: Verify if the ethernet0 alias is needed
-		ethernet0 = &gmac;
-	};
 };
 
 &blsp1_spi1 {
@@ -148,18 +143,21 @@
 	status = "okay";
 	nvmem-cell-names = "pre-calibration";
 	nvmem-cells = <&precal_art_1000>;
-	qcom,ath10k-calibration-variant = "Qxwlan-E2600AC-C2";
+	qcom,calibration-variant = "Qxwlan-E2600AC-C2";
 };
 
 &wifi1 {
 	status = "okay";
 	nvmem-cell-names = "pre-calibration";
 	nvmem-cells = <&precal_art_5000>;
-	qcom,ath10k-calibration-variant = "Qxwlan-E2600AC-C2";
+	qcom,calibration-variant = "Qxwlan-E2600AC-C2";
 };
 
 &gmac {
 	status = "okay";
+
+	nvmem-cell-names = "mac-address";
+	nvmem-cells = <&macaddr_gmac0>;
 };
 
 &switch {
@@ -169,9 +167,6 @@
 &swport2 {
 	status = "okay";
 	label = "sw-eth1";
-
-	nvmem-cell-names = "mac-address";
-	nvmem-cells = <&macaddr_gmac0>;
 };
 
 &swport4 {

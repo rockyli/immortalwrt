@@ -8,10 +8,10 @@
 include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/kernel.mk
 
-PKG_VERSION:=2026.01
+PKG_VERSION:=2026.10
 PKG_RELEASE:=1
 
-PKG_HASH:=b60d5865cefdbc75da8da4156c56c458e00de75a49b80c1a2e58a96e30ad0d54
+PKG_HASH:=3f856da3cbbc93af51ff95fde18588a348b4a26723b01d9841e999d988481015
 
 include $(INCLUDE_DIR)/u-boot.mk
 include $(INCLUDE_DIR)/package.mk
@@ -70,7 +70,7 @@ endef
 define U-Boot/rb5009
   NAME:=MikroTik RB5009
   BUILD_SUBTARGET:=cortexa72
-  BUILD_DEVICES:=mikrotik_rb5009
+  BUILD_DEVICES:=mikrotik_rb5009ug mikrotik_rb5009upr
   UBOOT_CONFIG:=mvebu_rb5009
   UBOOT_IMAGE:=u-boot.elf
 endef

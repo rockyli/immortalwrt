@@ -199,6 +199,7 @@
 			partition@1800000 {
 				label = "rootfs";
 				reg = <0x1800000 0x1d00000>;
+				linux,rootfs;
 			};
 
 			partition@3500000 {
@@ -265,10 +266,10 @@
 
 /* The MF287Plus and MF287Pro share the same board data file */
 &wifi0 {
-	qcom,ath10k-calibration-variant = "zte,mf287plus";
+	qcom,calibration-variant = "zte,mf287plus";
 };
 
 /* The MF287Plus and MF287Pro share the same board data file */
 &wifi1{
-	qcom,ath10k-calibration-variant = "zte,mf287plus";
+	qcom,calibration-variant = "zte,mf287plus";
 };

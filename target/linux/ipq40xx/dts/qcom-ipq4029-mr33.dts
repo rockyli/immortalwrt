@@ -14,10 +14,6 @@
 	};
 };
 
-&tricolor {
-	enable-gpios = <&tlmm 48 GPIO_ACTIVE_HIGH>;
-};
-
 &pcie0 {
 	status = "okay";
 };
@@ -33,12 +29,12 @@
 
 &wifi0 {
 	status = "okay";
-	qcom,ath10k-calibration-variant = "Meraki-MR33";
+	qcom,calibration-variant = "Meraki-MR33";
 };
 
 &wifi1 {
 	status = "okay";
-	qcom,ath10k-calibration-variant = "Meraki-MR33";
+	qcom,calibration-variant = "Meraki-MR33";
 };
 
 &mdio {
