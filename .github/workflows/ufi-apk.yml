@@ -1,0 +1,53 @@
+name: UFI official APK compatibility
+on:
+  push:
+    branches: [ufi-msm8916]
+    paths: [.github/workflows/ufi-apk.yml]
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Find the latest successful UFI001C firmware artifact
+        id: firmware
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          artifact=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" |
+            jq -er '[.artifacts[] | select(.expired == false and .workflow_run.head_branch == "ufi-msm8916" and (.name | startswith("UFI001C_MB_V01-")))] | first | select(.)')
+          jq -r '"name=\(.name)\nrun=\(.workflow_run.id)"' <<< "$artifact" >> "$GITHUB_OUTPUT"
+          jq '{name,digest,workflow_run}' <<< "$artifact"
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.firmware.outputs.name }}
+          run-id: ${{ steps.firmware.outputs.run }}
+          github-token: ${{ github.token }}
+          path: firmware
+      - name: Verify official indexes and resolve packages with the image's APK
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y android-sdk-libsparse-utils qemu-user-static
+          image=$(find firmware -type f -name '*-ext4-system.img' -print -quit)
+          cd "$(dirname "$image")"
+          sha256sum -c SHA256SUMS
+          simg2img *-ext4-system.img "$RUNNER_TEMP/test.ext4"
+          root="$RUNNER_TEMP/ufi-root"
+          mkdir "$root"
+          sudo mount -o loop "$RUNNER_TEMP/test.ext4" "$root"
+          trap 'sudo umount "$root"' EXIT
+          sudo cp /usr/bin/qemu-aarch64-static "$root/tmp/"
+          sudo cp --remove-destination -L /etc/resolv.conf "$root/etc/resolv.conf"
+          apk=$(sudo find "$root" -type f -name apk -print -quit)
+          guest_apk() { sudo chroot "$root" /tmp/qemu-aarch64-static "${apk#"$root"}" "$@"; }
+          cat "$root/etc/apk/repositories.d/distfeeds.list"
+          guest_apk --version
+          guest_apk update
+          for package in tree nano; do
+            guest_apk add --simulate "$package"
+          done

@@ -1,0 +1,8 @@
+#!/bin/sh
+
+. /lib/functions/uci-defaults.sh
+
+board_config_update
+ucidef_set_interface lan ipaddr '192.168.4.1' netmask '255.255.255.0'
+ucidef_set_wireless 2g 'ImmortalWrt' 'psk2' '1234567890'
+board_config_flush
