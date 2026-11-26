@@ -24,6 +24,20 @@ git diff --stat a0863614715f843cea107748399b46f4e46df4b1 7fe583d96eabe34efdc2f76
 
 同步官方更新时，先从已验收提交建立候选分支，合入选定官方提交，审查上述板级差异，按需要成组更新 feeds。构建、启动、USB 管理、Wi-Fi、蜂窝注册和数据通信逐项记录。单臂旁路脚本作为系统启动后的配置阶段独立验收。
 
+## UFI001C 的 SquashFS 试验
+
+`ufi-msm8916-squashfs` 从 ext4 稳定版 #9（`66f15c9b1b`）派生。第一阶段仅构建 UFI001C_MB_V01。只读系统和持久可写层共用现有的 `p14/rootfs`。普通重启应保留配置，LuCI 恢复出厂应清除安装的软件、配置和本地凭据。需保留的 PSG 配置和密钥请在迁移或重置前另行备份。
+
+**首次迁移和回退均使用 Fastboot。** 下载该板同一次成功构建的成对镜像，在 Windows 用 `Get-FileHash *.img -Algorithm SHA256` 与制品内的 `SHA256SUMS` 核对。用 `adb shell cat /usr/share/ufi/pcb` 确认板型为 `UFI001C_MB_V01`，仅连接这一台设备。用 `adb reboot bootloader` 进入 Fastboot 并以 `fastboot devices` 确认枚举。先将文件名以 `-squashfs-system.img` 结尾的镜像刷到 `rootfs`，再将 `-squashfs-boot.img` 刷到 `boot`。每步均须显示成功，随后执行 `fastboot reboot`。两次写入使用现有 GPT，只涉及 p14 和 p12。回退 #9 时照此使用 #9 的一对 ext4 镜像。试验版关闭在线固件升级，LuCI 的恢复出厂独立工作。
+
+**UFI001C 真机验收**（每次首次启动及重置后从 LAN 接入）。
+
+1. 首次启动后确认 `cat /usr/share/ufi/pcb` 和 `cat /etc/openwrt_release`。用 `awk '$2=="/rom" || $2=="/overlay" || $2=="/"' /proc/mounts` 检查 `/rom` 为只读 SquashFS，`/overlay` 为 loop 设备上的 F2FS，`/` 为 overlay。记录 `df -h /overlay` 的可用空间。若只出现 tmpfs 可写层，记录挂载和启动日志，暂缓部署。
+2. 在设备上运行 `echo test > /etc/ufi-reset-test`，普通重启后确认标记仍在。登录 LuCI「系统 → 备份/升级」执行恢复出厂，等待重启完成。重连 USB 或 Wi-Fi 后手动打开 `https://192.168.4.1/` 重新登录，确认标记消失、固件 revision 一致、持久挂载重新建立。
+3. 在这个干净系统部署 PSG 2.4.8，记录 Tailscale、OpenClash/Mihomo、LuCI 和重启后的终验结果。需要复测全新部署时再次执行恢复出厂，核对旧应用、本机节点身份和自定义配置已清除。
+
+记录 UFI001C 的验收结果后再扩展至 UFI003C_MB_V02，分别保留两块板的实测结果，供合并回 `ufi-msm8916` 时核对。
+
 ## 升级包和软件源
 
 两块板的构建分别归档 Fastboot boot/system 镜像和解压后的 sysupgrade.tar。旧 x7780 及首版 351d5f293a8 没有此平台处理器，首次迁移使用已核对布局的 LK1ST Fastboot。后续版本可从带本处理器的系统运行 `sysupgrade -T /tmp/固件.tar` 做无写入检查。CI 验证制包、ext4、完整性和负例；真机升级、保留配置及重启仍需单独实测。

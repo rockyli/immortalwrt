@@ -7,6 +7,13 @@ define Device/msm8916
 	CMDLINE := "earlycon console=tty0 console=ttyMSM0,115200 root=/dev/mmcblk0p14 rw rootwait"
 endef
 
+# fstools finds rootfs_data on the next 64 KiB boundary. A nonzero marker
+# forces Fastboot to write the block even when reflashing the same image.
+# The zero sector at +512 also rules out restoring a stale sysupgrade backup.
+define Build/ufi-overlay-marker
+	printf '\336\255\300\336' | dd bs=4096 conv=sync >> $@
+endef
+
 define Device/ufi-ext4
   ifeq ($(CONFIG_TARGET_msm89xx_msm8916_DEVICE_openstick-ufi001c)$(CONFIG_TARGET_msm89xx_msm8916_DEVICE_openstick-ufi003)$(CONFIG_TARGET_ROOTFS_EXT4FS),yy)
     IMAGES += sysupgrade.tar
@@ -28,6 +35,12 @@ endef
 define Device/openstick-ufi001c
   $(Device/ufi-common)
   $(Device/ufi-ext4)
+  ifeq ($(CONFIG_TARGET_msm89xx_msm8916_DEVICE_openstick-ufi001c):$(CONFIG_TARGET_ROOTFS_SQUASHFS):$(CONFIG_TARGET_ROOTFS_EXT4FS),y:y:)
+    FILESYSTEMS := squashfs
+    CMDLINE := "earlycon console=tty0 console=ttyMSM0,115200 root=/dev/mmcblk0p14 rootfstype=squashfs ro rootwait"
+    IMAGE/boot.img/squashfs := append-kernel | aboot-img
+    IMAGE/system.img/squashfs := append-rootfs | pad-to 64k | ufi-overlay-marker | sparse-img
+  endif
 endef
 TARGET_DEVICES += openstick-ufi001c
 
