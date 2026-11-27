@@ -3,12 +3,13 @@
 set -euo pipefail
 dest=$1
 board=$2
+filesystem=${3:-ext4}
 work=$(mktemp -d)
 root=$work/root
 mkdir "$root"
 cleanup() {
     if mountpoint -q "$root"; then sudo umount "$root" || return 1; fi
-    rm -rf "$work"
+    sudo rm -rf -- "$work"
 }
 trap cleanup EXIT
 case "$board" in
@@ -17,11 +18,23 @@ case "$board" in
     *) exit 1 ;;
 esac
 shopt -s nullglob
-images=("$dest"/*-openstick-"$profile"-ext4-system.img)
+images=("$dest"/*-openstick-"$profile"-"$filesystem"-system.img)
 manifests=("$dest"/*-openstick-"$profile".manifest)
 [[ ${#images[@]} == 1 && ${#manifests[@]} == 1 ]]
-simg2img "${images[0]}" "$work/system.ext4"
-sudo mount -o loop,nodev,nosuid "$work/system.ext4" "$root"
+simg2img "${images[0]}" "$work/system.raw"
+case "$filesystem" in
+    ext4) sudo mount -o loop,nodev,nosuid "$work/system.raw" "$root" ;;
+    squashfs)
+        sudo unsquashfs -no-progress -d "$root" "$work/system.raw"
+        for tool in /sbin/firstboot /sbin/factoryreset /sbin/mount_root /usr/sbin/mkfs.f2fs; do
+            test -x "$root$tool"
+        done
+        test ! -e "$root/etc/uci-defaults/00_rootfs_resizer"
+        if grep -q '^rootfs-resizer ' "${manifests[0]}"; then exit 1; fi
+        cmp "$root/lib/upgrade/platform.sh" target/linux/msm89xx/ufi/platform-fastboot-only.sh
+        ;;
+    *) echo "Unsupported filesystem: $filesystem" >&2; exit 1 ;;
+esac
 [[ $(cat "$root/usr/share/ufi/pcb") == "$board" ]]
 
 manifest_version() {
@@ -45,6 +58,19 @@ check_installed() {
         END {exit found!=1}
     ' "$db" || { echo "Image database mismatch: $1 $2 $3" >&2; return 1; }
 }
+radio_packages=("qcom-msm8916-modem-openstick-$profile-firmware"
+                "qcom-msm8916-openstick-$profile-wcnss-firmware"
+                "qcom-msm8916-wcnss-openstick-$profile-nv")
+for pkg in "${radio_packages[@]}"; do
+    version=$(manifest_version "$pkg")
+    check_installed "$pkg" "$version" ""
+done
+foreign=$(awk -v profile="$profile" '
+    {p=$1; sub(/^P:/,"",p)}
+    p ~ /^qcom-msm8916-(modem-openstick-|openstick-|wcnss-openstick-)/ &&
+        !index(p, "-openstick-" profile "-") {print p}
+' "${manifests[0]}" "$db" | sort -u)
+[[ -z "$foreign" ]] || { echo "$board: unexpected radio firmware: $foreign" >&2; exit 1; }
 check_installed kernel "$kernel" ""
 echo "$board installed kernel: $kernel"
 for pkg in "${modules[@]}"; do
@@ -109,7 +135,7 @@ guest_apk --version
 guest_apk update
 for pkg in tree nano; do guest_apk add --simulate "$pkg"; done
 
-# PSG v2.4.5 step 20 plus its Tailscale and LuCI stages. Pin the installed kernel ABI.
+# PSG OpenClash, Tailscale, LuCI and operations dependencies. Pin the installed kernel ABI.
 deps=(bash dnsmasq-full curl ca-bundle ip-full ruby ruby-yaml unzip luci-compat luci luci-base ss
       tailscale luci-app-tailscale-community)
 transaction=(--allow-untrusted "/tmp/$apk_name" "kernel=$kernel" "${modules[@]}" "${deps[@]}")

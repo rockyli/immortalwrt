@@ -19,7 +19,7 @@ jobs:
         run: |
           set -euo pipefail
           artifact=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" |
-            jq -er '[.artifacts[] | select(.expired == false and .workflow_run.head_branch == "ufi-msm8916" and (.name | startswith("UFI001C_MB_V01-")))] | first | select(.)')
+            jq -er '[.artifacts[] | select(.expired == false and .workflow_run.head_branch == "ufi-msm8916" and .name == ("UFI001C_MB_V01-" + .workflow_run.head_sha))] | first | select(.)')
           jq -r '"name=\(.name)\nrun=\(.workflow_run.id)"' <<< "$artifact" >> "$GITHUB_OUTPUT"
           jq '{name,digest,workflow_run}' <<< "$artifact"
       - uses: actions/download-artifact@v4

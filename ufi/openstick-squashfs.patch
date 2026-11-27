@@ -1,0 +1,12 @@
+diff --git a/utils/openstick-tweaks/Makefile b/utils/openstick-tweaks/Makefile
+--- a/utils/openstick-tweaks/Makefile
++++ b/utils/openstick-tweaks/Makefile
+@@ -17,7 +17,7 @@ define Package/$(PKG_NAME)
+ 	SECTION:=Utilities
+ 	CATEGORY:=Utilities
+ 	TITLE:=Defaults Setting For OpenStick
+-	DEPENDS:=+gc +android-tools-adbd +rootfs-resizer +qmi-modem-410-init +PACKAGE_luci:luci-proto-modemmanager
++	DEPENDS:=+gc +android-tools-adbd +TARGET_ROOTFS_EXT4FS:rootfs-resizer +qmi-modem-410-init +PACKAGE_luci:luci-proto-modemmanager
+ endef
+ 
+ define Build/Configure

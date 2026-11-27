@@ -1,0 +1,12 @@
+name: UFI001C SquashFS experiment
+on:
+  push:
+    branches: [ufi-msm8916-squashfs]
+permissions:
+  contents: read
+jobs:
+  fastboot:
+    uses: ./.github/workflows/ufi-build.yml
+    with:
+      board: UFI001C_MB_V01
+      squashfs: true

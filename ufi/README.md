@@ -4,14 +4,14 @@
 
 | PCB | profile | 镜像状态依据 |
 | --- | --- | --- |
-| UFI001C_MB_V01 | openstick-ufi001c | 旧 x7780 固件在本机启动过，6.12.85 / LK1ST。新构建单独验收。 |
-| UFI003C_MB_V02 | openstick-ufi003 | 商家系统的三项 ufi003 固件包、共用设备树和 p14 布局已核对。本项目镜像待真机验收。 |
+| UFI001C_MB_V01 | openstick-ufi001c | ext4 #9 和首个 SquashFS 构建均已通过 Fastboot 刷入并启动。 |
+| UFI003C_MB_V02 | openstick-ufi003 | ext4 已通过 Fastboot 刷入并启动，已通过 9008 读取 GPT。SquashFS 首刷、持久化和恢复出厂待真机验收。 |
 
 ## 板级改动
 
 - `target/linux/msm89xx/` 包含设备树、6.12 内核配置、memshare 补丁、内核模块和镜像配方。两板使用 msm8916-thwc-ufi001c 设备树，各自选择匹配的 modem、WCNSS 和 Wi-Fi NV 包。引导参数指定 /dev/mmcblk0p14。
 - `package/kernel/` 的社区差异涉及 netdevices、USB 及无线模块定义。基线另带 power 按键、musl 兼容头及 openstick feed。同步上游时可用下列命令复核全部差异。
-- `ufi/common.config` 选择 ext4、1024 MiB 根分区、LuCI、ModemManager、QRTR、rmtfs、OpenStick 初始化和扩容。两份 PCB 配置显式指定板型及三项固件包。基带包与每台设备自己的 NV 备份应分别保存。
+- `ufi/common.config` 提供 ext4 默认配置、1024 MiB 根镜像、LuCI、ModemManager、QRTR、rmtfs 和 OpenStick 初始化。SquashFS 构建叠加 `ufi/squashfs.config` 和 `ufi/squashfs.kernel`，首次启动由 fstools 创建 F2FS 可写层。两份 PCB 配置分别指定板型及三项无线固件包。基带包与每台设备自己的 NV 备份应分别保存。
 - 对照的 x7780/immortalwrt-Actios 版本为 `89e77bc84e0cb4a15fd11c8fb14f91aba808b814`。本仓库编译检出的源码，用精简配置与六个固定 feed 构建；feed 锁按主源码提交时间选取，历史镜像的确切 feed 清单未知。
 
 ```sh
@@ -20,13 +20,29 @@ git diff --stat a0863614715f843cea107748399b46f4e46df4b1 7fe583d96eabe34efdc2f76
 
 ## 构建与更新
 
-向 ufi-msm8916 推送代码会分别编译两块 PCB。工作流设有两板选择输入；GitHub 网页的手动触发入口要求该工作流也存在于默认分支。构建校验配置及 boot/system 镜像的哈希，保留 manifest、完整配置、diffconfig、feeds 和源码版本。CI 对每块板单独检查三项无线固件包及升级包。
+向 `ufi-msm8916` 推送固件代码会分别构建两块 PCB 的 ext4 和 SquashFS 镜像。每个组合独立归档 manifest、完整配置、feeds、源码提交和镜像摘要。ext4 制品沿用 `<PCB>-<提交>` 命名，SquashFS 制品为 `<PCB>-squashfs-fastboot-<提交>`。
 
 同步官方更新时，先从已验收提交建立候选分支，合入选定官方提交，审查上述板级差异，按需要成组更新 feeds。构建、启动、USB 管理、Wi-Fi、蜂窝注册和数据通信逐项记录。单臂旁路脚本作为系统启动后的配置阶段独立验收。
 
+## SquashFS 首刷与验收
+
+两块板均将只读 SquashFS 和持久可写层放在各自现有的 `p14/rootfs` 中。UFI001C 的依据是已通过真机验收的试验提交 `8eeb7385ad`。UFI003C 使用同一套镜像格式，配套自己的 PCB 标识、无线固件包和 eMMC 布局。
+
+**首次迁移和回退均使用 Fastboot。** 刷写会覆盖旧配置、已安装软件和本地凭据。下载与 PCB 丝印相符的同一次成功构建的成对镜像，在 Windows 用 `Get-FileHash *.img -Algorithm SHA256` 与制品内的 `SHA256SUMS` 核对。若设备已运行本项目固件，可通过 `adb shell cat /usr/share/ufi/pcb` 复核。UFI003C 的 SquashFS 镜像名含 `openstick-ufi003-squashfs`，对应 `p14` 容量为 6975455 个 512 字节扇区。UFI001C 对应 `openstick-ufi001c-squashfs` 和 7073759 个扇区。
+
+只连接待刷设备，执行 `adb reboot bootloader` 并通过 `fastboot devices` 确认枚举。先把该板的 `-squashfs-system.img` 写入 `rootfs`，再把同包的 `-squashfs-boot.img` 写入 `boot`，两步均成功后执行 `fastboot reboot`。写入使用现有 GPT，只涉及 p14 和 p12。回退时使用该板同次构建的一对 ext4 镜像。SquashFS 版本只提供 Fastboot 固件更新，LuCI 的恢复出厂通过 fstools 清空可写层。
+
+**真机验收**（每块板分别从 LAN 接入）。
+
+1. 首次启动后确认 `cat /usr/share/ufi/pcb` 和 `cat /etc/openwrt_release`。用 `awk '$2=="/rom" || $2=="/overlay" || $2=="/"' /proc/mounts` 检查 `/rom` 为只读 SquashFS，`/overlay` 为 loop 设备上的 F2FS，`/` 为 overlay。记录 `df -h /overlay` 的可用空间。若只出现 tmpfs 可写层，记录挂载和启动日志，暂缓部署。
+2. 在设备上运行 `echo test > /etc/ufi-reset-test`，普通重启后确认标记仍在。登录 LuCI「系统 → 备份/升级」执行恢复出厂，等待重启完成。重连 USB 或 Wi-Fi 后手动打开 `https://192.168.4.1/` 重新登录，确认标记消失、固件 revision 一致、持久挂载重新建立。
+3. 在这个干净系统部署 PSG 2.4.8，记录 Tailscale、OpenClash/Mihomo、LuCI 和重启后的终验结果。需要复测全新部署时再次执行恢复出厂，核对旧应用、本机节点身份和自定义配置已清除。
+
+UFI001C 的 `r39404-8eeb7385ad` 已验证只读 SquashFS、可写 F2FS、普通重启保留标记和 LuCI 恢复出厂清除标记。部署完整 PSG 前已验证四个内核模块的 ABI、运行中的 TUN 接口、TPROXY 规则语法、Lua 桥接及 LuCI HTTPS。独立安装的 Tailscale 已上线。UFI001C 的完整 PSG 部署和 UFI003C 的 SquashFS 真机验收仍待完成。
+
 ## 升级包和软件源
 
-两块板的构建分别归档 Fastboot boot/system 镜像和解压后的 sysupgrade.tar。旧 x7780 及首版 351d5f293a8 没有此平台处理器，首次迁移使用已核对布局的 LK1ST Fastboot。后续版本可从带本处理器的系统运行 `sysupgrade -T /tmp/固件.tar` 做无写入检查。CI 验证制包、ext4、完整性和负例；真机升级、保留配置及重启仍需单独实测。
+两块板的 ext4 构建分别归档 Fastboot boot/system 镜像和解压后的 sysupgrade.tar。旧 x7780 及首版 351d5f293a8 首次迁移使用已核对布局的 LK1ST Fastboot。带 ext4 升级处理器的系统可运行 `sysupgrade -T /tmp/固件.tar` 做无写入检查。CI 验证制包、ext4、完整性和负例。UFI001C 曾出现校验通过而在线升级后版本仍旧的情况，在线升级仍待独立验收。
 
 处理器核对安装固件标识、运行设备树、根启动参数和历史记录的 14 个 eMMC 分区的标签、起点、容量。两块板共用 DT，软件标识不等同于物理丝印检测。实测两板 p14 起点均为 659456，UFI003C 容量为 6975455 个扇区，UFI001C 为 7073759。两板升级包分别绑定 PCB。布局或包校验失败返回 74，阻止普通 sysupgrade 强制刷入。进入 RAM 后再次检查，验证 rootfs 和 boot 内容并在写后回读。内核最后写入。单槽写入期间没有原子回滚。包内摘要用于检错，下载应核对可信构建产物的 SHA256SUMS。
 
