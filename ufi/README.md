@@ -1,13 +1,13 @@
 # 高通 410 上网棒构建
 
-本候选分支 `ufi-v25.12.2` 以官方正式标签 [ImmortalWrt v25.12.2](https://github.com/immortalwrt/immortalwrt/tree/v25.12.2)（`4fc16f2985a`）为直接基线，内核为 6.12.103。从维护分支 `66f15c9b1bd` 移入社区板级差异和两板构建、升级、验收配置。通用 feeds 按该标签的 `feeds.conf.default` 锁定，OpenStick 保留原提交。两板构建与真机验收待完成。
+本分支 `ufi-v25.12.2` 以官方正式标签 [ImmortalWrt v25.12.2](https://github.com/immortalwrt/immortalwrt/tree/v25.12.2)（`4fc16f2985a`）为基线，内核为 6.12.103。板级支持来自 `ufi-msm8916` 的 `66f15c9b1bd`，SquashFS 支持移自该线的 `8d2ba4b828`。通用 feeds 按发行标签的 `feeds.conf.default` 锁定，OpenStick 保留原提交。
 
 官方上游为 immortalwrt/immortalwrt。设备分支 ufi-msm8916 从 x7780 锁定的社区提交 `7fe583d96eabe34efdc2f764a6f413a56e687eca` 起步。该提交的第二父提交 `a0863614715f843cea107748399b46f4e46df4b1` 用于对照官方源码。初版保留社区提交的完整历史和适配，便于复查改动；它包含其他 MSM8916 板型。
 
 | PCB | profile | 镜像状态依据 |
 | --- | --- | --- |
-| UFI001C_MB_V01 | openstick-ufi001c | 旧 x7780 固件在本机启动过，6.12.85 / LK1ST。新构建单独验收。 |
-| UFI003C_MB_V02 | openstick-ufi003 | 商家系统的三项 ufi003 固件包、共用设备树和 p14 布局已核对。本项目镜像待真机验收。 |
+| UFI001C_MB_V01 | openstick-ufi001c | 6.12.85 的 SquashFS 已验证普通重启保留配置、LuCI 恢复出厂清除配置。25.12.2 需独立实测。 |
+| UFI003C_MB_V02 | openstick-ufi003 | 25.12.2 ext4 提交 `6e581b7252` 已用 Fastboot 首刷，实机确认可写 ext4、6.12.103 及蜂窝联网。25.12.2 SquashFS 需独立实测。 |
 
 ## 板级改动
 
@@ -22,17 +22,26 @@ git diff --stat a0863614715f843cea107748399b46f4e46df4b1 7fe583d96eabe34efdc2f76
 
 ## 构建与更新
 
-向 `ufi-v25.12.2` 推送会启动独立的 `UFI firmware · 25.12.2 candidate` 工作流，同时构建两块 PCB。此候选的制品名称含 `ufi-25.12.2`、板型及源码 SHA。稳定维护分支 `ufi-msm8916` 继续使用 `UFI firmware`。构建校验配置及 boot/system 镜像的哈希，保留 manifest、完整配置、diffconfig、feeds 和源码版本。CI 对每块板单独检查三项无线固件包及升级包。
+向 `ufi-v25.12.2` 推送会启动独立的 `UFI firmware · 25.12.2 candidate` 工作流，分别构建两块 PCB 的 ext4 和 SquashFS。制品按板型、格式和提交独立归档，包内附 `source.sha`、`SHA256SUMS`、manifest、配置、锁定的 feeds 和验包报告。设备的发行版 revision 沿用官方标签，具体维护提交以制品的 `source.sha` 为准。
 
 同步官方更新时，先从已验收提交建立候选分支，合入选定官方提交，审查上述板级差异，按需要成组更新 feeds。构建、启动、USB 管理、Wi-Fi、蜂窝注册和数据通信逐项记录。单臂旁路脚本作为系统启动后的配置阶段独立验收。
 
 ## 升级包和软件源
 
-两块板的构建分别归档 Fastboot boot/system 镜像和解压后的 sysupgrade.tar。旧 x7780 及首版 351d5f293a8 没有此平台处理器，首次迁移使用已核对布局的 LK1ST Fastboot。后续版本可从带本处理器的系统运行 `sysupgrade -T /tmp/固件.tar` 做无写入检查。CI 验证制包、ext4、完整性和负例；真机升级、保留配置及重启仍需单独实测。
+两块板的 ext4 构建分别归档 Fastboot boot/system 镜像和解压后的 sysupgrade.tar。旧 x7780 及首版 351d5f293a8 没有此平台处理器，首次迁移使用已核对布局的 LK1ST Fastboot。后续版本可从带本处理器的 ext4 系统运行 `sysupgrade -T /tmp/固件.tar` 做无写入检查。CI 验证制包、ext4、完整性和负例，真机在线升级仍须单独实测。
 
 处理器核对安装固件标识、运行设备树、根启动参数和历史记录的 14 个 eMMC 分区的标签、起点、容量。两块板共用 DT，软件标识不等同于物理丝印检测。实测两板 p14 起点均为 659456，UFI003C 容量为 6975455 个扇区，UFI001C 为 7073759。两板升级包分别绑定 PCB。布局或包校验失败返回 74，阻止普通 sysupgrade 强制刷入。进入 RAM 后再次检查，验证 rootfs 和 boot 内容并在写后回读。内核最后写入。单槽写入期间没有原子回滚。包内摘要用于检错，下载应核对可信构建产物的 SHA256SUMS。
 
 使用 ImmortalWrt 25.12.2 的 aarch64_generic 通用软件源，并按构建产物中的 apk-compatibility.txt 核对签名及示例依赖求解。官方没有该 MSM8916 target 的内核包仓库。更新里程碑时逐项核对用户态库 ABI。带 kmod 依赖的包需配套同次 CI 的模块；当前制品不发布完整私有 APK 仓库。
+
+## SquashFS 首刷和恢复出厂验收
+
+SquashFS 通过 Fastboot 更新。只读系统和 F2FS 可写层共用该板现有的 p14/rootfs。刷写会覆盖当前系统、设置和本地凭据。保留本板已实测的 ext4 配对镜像和必要的个人配置，用于回退。
+
+1. 核对 PCB 丝印、运行系统的 `/usr/share/ufi/pcb`、p12/p14 布局以及制品内两份镜像的 SHA-256。只连接待刷设备。使用同一制品的 `-squashfs-system.img` 和 `-squashfs-boot.img`，在 Fastboot 中依次写入 `rootfs` 和 `boot`，两步成功后再重启。
+2. 首次启动核对 PCB、发行版 25.12.2 和内核 6.12.103。运行 `awk '$2=="/rom" || $2=="/overlay" || $2=="/"' /proc/mounts`，应看到只读 SquashFS、可写 loop/F2FS 和合并后的 overlay 根。用 `df -h /overlay` 记录空间。
+3. 创建 `/etc/ufi-reset-test`，普通重启后确认标记仍在。通过 LAN 登录 LuCI「系统 → 备份/升级」执行恢复出厂。重启后确认标记消失、固件版本一致、F2FS 可写层已挂载。恢复出厂会清除密码、SSH 公钥及已安装应用。
+4. 在干净系统上验证 USB 管理、Wi-Fi DHCP、LuCI HTTPS、蜂窝注册、客户端经蜂窝上网、重启自动重连及 `apk update`。两块板分别记录实测结果。
 
 ## 两块板的出厂网络配置
 

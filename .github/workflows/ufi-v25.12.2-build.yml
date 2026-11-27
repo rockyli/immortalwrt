@@ -11,20 +11,27 @@ on:
         type: choice
         options: [both, UFI001C_MB_V01, UFI003C_MB_V02]
         default: both
+      filesystem:
+        description: Image filesystem
+        type: choice
+        options: [both, ext4, squashfs]
+        default: both
 permissions:
   contents: read
 jobs:
   firmware:
-    name: 25.12.2 · ${{ matrix.board }}
+    name: 25.12.2 · ${{ matrix.board }} (${{ matrix.filesystem }})
     if: github.ref == 'refs/heads/ufi-v25.12.2'
     strategy:
       fail-fast: false
       matrix:
         board: ${{ fromJSON(inputs.board && inputs.board != 'both' && format('["{0}"]', inputs.board) || '["UFI001C_MB_V01","UFI003C_MB_V02"]') }}
+        filesystem: ${{ fromJSON(inputs.filesystem && inputs.filesystem != 'both' && format('["{0}"]', inputs.filesystem) || '["ext4","squashfs"]') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 330
     env:
       BOARD: ${{ matrix.board }}
+      FS: ${{ matrix.filesystem }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -33,8 +40,15 @@ jobs:
       - name: Prepare build host
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
-          sudo apt-get update
-          sudo apt-get install -y build-essential clang flex bison g++-multilib gawk gcc-multilib gettext git libncurses-dev libssl-dev python3-setuptools python3-pyelftools rsync swig unzip zlib1g-dev file wget libelf-dev android-sdk-libsparse-utils qemu-user-static
+          sources="$RUNNER_TEMP/ufi-ubuntu.list"
+          cat > "$sources" <<'APT'
+          deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] https://archive.ubuntu.com/ubuntu noble main universe
+          deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] https://archive.ubuntu.com/ubuntu noble-updates main universe
+          deb [signed-by=/usr/share/keyrings/ubuntu-archive-keyring.gpg] https://security.ubuntu.com/ubuntu noble-security main universe
+          APT
+          apt_opts=(-o "Dir::Etc::sourcelist=$sources" -o Dir::Etc::sourceparts=- -o Acquire::Retries=3)
+          sudo apt-get "${apt_opts[@]}" update
+          sudo apt-get "${apt_opts[@]}" install -y build-essential clang flex bison g++-multilib gawk gcc-multilib gettext git libncurses-dev libssl-dev python3-setuptools python3-pyelftools rsync swig unzip zlib1g-dev file wget libelf-dev android-sdk-libsparse-utils qemu-user-static squashfs-tools
           git clone --depth 1 --branch android-14.0.0_r1 https://android.googlesource.com/platform/system/tools/mkbootimg "$RUNNER_TEMP/android-boot-tools"
           test "$(git -C "$RUNNER_TEMP/android-boot-tools" rev-parse HEAD)" = 028bdc06ce87ab1ee23204feb5cd5ee406484618
           sudo ln -s "$RUNNER_TEMP/android-boot-tools/mkbootimg.py" /usr/local/bin/mkbootimg
@@ -45,12 +59,33 @@ jobs:
         run: |
           cp ufi/feeds.conf feeds.conf
           ./scripts/feeds update -a
+          if [[ "$FS" == squashfs ]]; then
+            git -C feeds/openstick apply "$GITHUB_WORKSPACE/ufi/openstick-squashfs.patch"
+            ./scripts/feeds update -i openstick
+          fi
           ./scripts/feeds install -a
-          cat ufi/common.config "ufi/$BOARD.config" > .config
+          requested="$RUNNER_TEMP/ufi.config"
+          fragments=(+ ufi/common.config "ufi/$BOARD.config")
+          if [[ "$FS" == squashfs ]]; then
+            fragments=(+ "${fragments[@]}" ufi/squashfs.config)
+            mkdir -p env
+            cp ufi/squashfs.kernel env/kernel-config
+          fi
+          scripts/kconfig.pl "${fragments[@]}" > "$requested"
+          cp "$requested" .config
           make defconfig
           while read -r required; do
-            grep -Fqx "$required" .config || { echo "Unresolved option $required"; exit 1; }
-          done < <(grep -h '^CONFIG_' ufi/common.config "ufi/$BOARD.config")
+            if [[ "$required" == "# "* ]]; then
+              symbol=${required#\# }
+              symbol=${symbol%% *}
+              if grep -q "^${symbol}=" .config; then
+                echo "Unexpectedly enabled $symbol"
+                exit 1
+              fi
+            else
+              grep -Fqx "$required" .config || { echo "Unresolved option $required"; exit 1; }
+            fi
+          done < "$requested"
       - name: Build
         run: |
           make -j8 download
@@ -69,9 +104,9 @@ jobs:
           git rev-parse HEAD > "$dest/source.sha"
           cd bin/targets/msm89xx/msm8916
           ls -lh
+          shopt -s nullglob
           for part in boot system; do
-            shopt -s nullglob
-            candidates=( *"-openstick-$profile-ext4-$part.img" *"-openstick-$profile-ext4-$part.img.gz" )
+            candidates=( *"-openstick-$profile-$FS-$part.img" *"-openstick-$profile-$FS-$part.img.gz" )
             test "${#candidates[@]}" = 1
             image=${candidates[0]}
             test -s "$image"
@@ -82,22 +117,28 @@ jobs:
               cp "$image" "$dest/"
             fi
           done
-          cp *.manifest "$dest"
-          for pkg in "qcom-msm8916-modem-openstick-$profile-firmware" "qcom-msm8916-openstick-$profile-wcnss-firmware" "qcom-msm8916-wcnss-openstick-$profile-nv"; do
-            grep -F "$pkg " *.manifest
-          done
-          candidates=( *"-openstick-$profile-ext4-sysupgrade.tar" *"-openstick-$profile-ext4-sysupgrade.tar.gz" )
-          test "${#candidates[@]}" = 1
-          package=${candidates[0]}
-          grep -F "$package" sha256sums | sha256sum -c -
-          if [[ "$package" == *.gz ]]; then
-            gzip -dc "$package" > "$dest/${package%.gz}"
+          manifests=( *"-openstick-$profile.manifest" )
+          test "${#manifests[@]}" = 1
+          cp "${manifests[0]}" "$dest/"
+          if [[ "$FS" == ext4 ]]; then
+            candidates=( *"-openstick-$profile-ext4-sysupgrade.tar" *"-openstick-$profile-ext4-sysupgrade.tar.gz" )
+            test "${#candidates[@]}" = 1
+            package=${candidates[0]}
+            grep -F "$package" sha256sums | sha256sum -c -
+            if [[ "$package" == *.gz ]]; then
+              gzip -dc "$package" > "$dest/${package%.gz}"
+            else
+              cp "$package" "$dest/"
+            fi
+            cd "$GITHUB_WORKSPACE"
+            export PATH="$PWD/staging_dir/host/bin:$PATH"
+            bash ufi/check-upgrade.sh "$dest/${package%.gz}" "$BOARD"
           else
-            cp "$package" "$dest/"
+            candidates=( *sysupgrade.tar* )
+            test "${#candidates[@]}" = 0
+            cd "$GITHUB_WORKSPACE"
+            bash ufi/check-squashfs.sh "$dest" "$BOARD"
           fi
-          cd "$GITHUB_WORKSPACE"
-          export PATH="$PWD/staging_dir/host/bin:$PATH"
-          bash ufi/check-upgrade.sh "$dest/${package%.gz}" "$BOARD"
           cd "$dest"
           sha256sum *.img *.tar > SHA256SUMS
           cat SHA256SUMS
@@ -106,12 +147,12 @@ jobs:
         run: |
           set -euo pipefail
           dest="$PWD/artifacts/$BOARD"
-          bash ufi/check-apk.sh "$dest" "$BOARD" 2>&1 | tee "$dest/apk-compatibility.txt"
+          bash ufi/check-apk.sh "$dest" "$BOARD" "$FS" 2>&1 | tee "$dest/apk-compatibility.txt"
       - name: Preserve image output if verification fails
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: ufi-25.12.2-diagnostics-${{ matrix.board }}-${{ github.run_id }}
+          name: ufi-25.12.2-diagnostics-${{ matrix.board }}-${{ matrix.filesystem }}-${{ github.run_id }}
           path: |
             bin/targets/msm89xx/msm8916/*.img*
             bin/targets/msm89xx/msm8916/*sysupgrade.tar*
@@ -120,6 +161,6 @@ jobs:
             artifacts/*/apk-compatibility.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: ufi-25.12.2-${{ env.BOARD }}-${{ github.sha }}
+          name: ufi-25.12.2-${{ env.BOARD }}${{ matrix.filesystem == 'squashfs' && '-squashfs-fastboot' || '' }}-${{ github.sha }}
           path: artifacts/
           include-hidden-files: true

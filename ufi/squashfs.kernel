@@ -1,0 +1,5 @@
+# Install as env/kernel-config for either UFI board's SquashFS build.
+CONFIG_SQUASHFS=y
+CONFIG_SQUASHFS_XZ=y
+CONFIG_F2FS_FS=y
+CONFIG_F2FS_FS_XATTR=y

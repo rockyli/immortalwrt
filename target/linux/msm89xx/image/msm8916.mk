@@ -7,13 +7,27 @@ define Device/msm8916
 	CMDLINE := "earlycon console=tty0 console=ttyMSM0,115200 root=/dev/mmcblk0p14 rw rootwait"
 endef
 
-define Device/ufi-ext4
-  ifeq ($(CONFIG_TARGET_msm89xx_msm8916_DEVICE_openstick-ufi001c)$(CONFIG_TARGET_msm89xx_msm8916_DEVICE_openstick-ufi003)$(CONFIG_TARGET_ROOTFS_EXT4FS),yy)
-    IMAGES += sysupgrade.tar
-    IMAGE/sysupgrade.tar/ext4 := append-kernel | aboot-img | ufi-upgrade | append-metadata
-    IMAGE/system.img/ext4 := append-rootfs | ufi-check-ext4 | sparse-img | append-metadata
-    FILESYSTEMS := ext4
-    SUPPORTED_DEVICES += thwc,ufi001c
+# fstools finds rootfs_data on the next 64 KiB boundary. A nonzero marker
+# forces Fastboot to write the block even when reflashing the same image.
+# The zero sector at +512 also rules out restoring a stale sysupgrade backup.
+define Build/ufi-overlay-marker
+	printf '\336\255\300\336' | dd bs=4096 conv=sync >> $@
+endef
+
+define Device/ufi-images
+  ifeq ($(CONFIG_TARGET_msm89xx_msm8916_DEVICE_openstick-ufi001c)$(CONFIG_TARGET_msm89xx_msm8916_DEVICE_openstick-ufi003),y)
+    ifeq ($(CONFIG_TARGET_ROOTFS_EXT4FS),y)
+      FILESYSTEMS := ext4
+      IMAGES += sysupgrade.tar
+      IMAGE/sysupgrade.tar/ext4 := append-kernel | aboot-img | ufi-upgrade | append-metadata
+      IMAGE/system.img/ext4 := append-rootfs | ufi-check-ext4 | sparse-img | append-metadata
+      SUPPORTED_DEVICES += thwc,ufi001c
+    else ifeq ($(CONFIG_TARGET_ROOTFS_SQUASHFS),y)
+      FILESYSTEMS := squashfs
+      CMDLINE := "earlycon console=tty0 console=ttyMSM0,115200 root=/dev/mmcblk0p14 rootfstype=squashfs ro rootwait"
+      IMAGE/boot.img/squashfs := append-kernel | aboot-img
+      IMAGE/system.img/squashfs := append-rootfs | pad-to 64k | ufi-overlay-marker | sparse-img
+    endif
   endif
 endef
 
@@ -27,7 +41,7 @@ define Device/ufi-common
 endef
 define Device/openstick-ufi001c
   $(Device/ufi-common)
-  $(Device/ufi-ext4)
+  $(Device/ufi-images)
 endef
 TARGET_DEVICES += openstick-ufi001c
 
@@ -67,7 +81,7 @@ TARGET_DEVICES += openstick-w001
 
 define Device/openstick-ufi003
   $(Device/ufi-common)
-  $(Device/ufi-ext4)
+  $(Device/ufi-images)
   DEVICE_MODEL := OpenStick UFI003
   DEVICE_DTS_DIR := ../dts
   DEVICE_PACKAGES := openstick-tweaks wpad-basic-wolfssl qcom-msm8916-modem-openstick-ufi003-firmware qcom-msm8916-openstick-ufi003-wcnss-firmware qcom-msm8916-wcnss-openstick-ufi003-nv
