@@ -32,7 +32,6 @@ case "$filesystem" in
         test ! -e "$root/etc/uci-defaults/00_rootfs_resizer"
         if grep -q '^rootfs-resizer ' "${manifests[0]}"; then exit 1; fi
         cmp "$root/lib/upgrade/platform.sh" target/linux/msm89xx/ufi/platform-fastboot-only.sh
-        cmp "$root/usr/share/ufi/layout-v1" target/linux/msm89xx/ufi/layout-v1
         ;;
     *) echo "Unsupported filesystem: $filesystem" >&2; exit 1 ;;
 esac
@@ -59,6 +58,19 @@ check_installed() {
         END {exit found!=1}
     ' "$db" || { echo "Image database mismatch: $1 $2 $3" >&2; return 1; }
 }
+radio_packages=("qcom-msm8916-modem-openstick-$profile-firmware"
+                "qcom-msm8916-openstick-$profile-wcnss-firmware"
+                "qcom-msm8916-wcnss-openstick-$profile-nv")
+for pkg in "${radio_packages[@]}"; do
+    version=$(manifest_version "$pkg")
+    check_installed "$pkg" "$version" ""
+done
+foreign=$(awk -v profile="$profile" '
+    {p=$1; sub(/^P:/,"",p)}
+    p ~ /^qcom-msm8916-(modem-openstick-|openstick-|wcnss-openstick-)/ &&
+        !index(p, "-openstick-" profile "-") {print p}
+' "${manifests[0]}" "$db" | sort -u)
+[[ -z "$foreign" ]] || { echo "$board: unexpected radio firmware: $foreign" >&2; exit 1; }
 check_installed kernel "$kernel" ""
 echo "$board installed kernel: $kernel"
 for pkg in "${modules[@]}"; do

@@ -11,6 +11,10 @@ on:
         type: choice
         options: [UFI001C_MB_V01, UFI003C_MB_V02]
         default: UFI001C_MB_V01
+      squashfs:
+        description: Build the SquashFS Fastboot image
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       board:
@@ -23,16 +27,17 @@ permissions:
   contents: read
 jobs:
   firmware:
-    name: Build ${{ matrix.board }}
+    name: Build ${{ matrix.board }} (${{ matrix.filesystem }})
     strategy:
       fail-fast: false
       matrix:
         board: ${{ fromJSON(inputs.board && format('["{0}"]', inputs.board) || '["UFI001C_MB_V01","UFI003C_MB_V02"]') }}
+        filesystem: ${{ fromJSON(inputs.squashfs && '["squashfs"]' || inputs.board && '["ext4"]' || '["ext4","squashfs"]') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 330
     env:
       BOARD: ${{ matrix.board }}
-      FS: ${{ inputs.squashfs && 'squashfs' || 'ext4' }}
+      FS: ${{ matrix.filesystem }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -50,7 +55,7 @@ jobs:
           mkbootimg --kernel "$RUNNER_TEMP/kernel-test" --ramdisk /dev/null -o "$RUNNER_TEMP/boot-test.img"
           img2simg "$RUNNER_TEMP/kernel-test" "$RUNNER_TEMP/sparse-test.img"
       - name: Install SquashFS verification tools
-        if: inputs.squashfs
+        if: matrix.filesystem == 'squashfs'
         run: sudo apt-get install -y squashfs-tools
       - name: Install pinned feeds and select PCB
         run: |
@@ -64,10 +69,9 @@ jobs:
           requested="$RUNNER_TEMP/ufi.config"
           fragments=(+ ufi/common.config "ufi/$BOARD.config")
           if [[ "$FS" == squashfs ]]; then
-            test "$BOARD" = UFI001C_MB_V01
-            fragments=(+ "${fragments[@]}" "ufi/$BOARD-squashfs.config")
+            fragments=(+ "${fragments[@]}" ufi/squashfs.config)
             mkdir -p env
-            cp "ufi/$BOARD-squashfs.kernel" env/kernel-config
+            cp ufi/squashfs.kernel env/kernel-config
           fi
           scripts/kconfig.pl "${fragments[@]}" > "$requested"
           cp "$requested" .config
@@ -115,10 +119,9 @@ jobs:
               cp "$image" "$dest/"
             fi
           done
-          cp *.manifest "$dest"
-          for pkg in "qcom-msm8916-modem-openstick-$profile-firmware" "qcom-msm8916-openstick-$profile-wcnss-firmware" "qcom-msm8916-wcnss-openstick-$profile-nv"; do
-            grep -F "$pkg " *.manifest
-          done
+          manifests=( *"-openstick-$profile.manifest" )
+          test "${#manifests[@]}" = 1
+          cp "${manifests[0]}" "$dest/"
           if [[ "$FS" == ext4 ]]; then
             candidates=( *"-openstick-$profile-ext4-sysupgrade.tar" *"-openstick-$profile-ext4-sysupgrade.tar.gz" )
             test "${#candidates[@]}" = 1
@@ -136,7 +139,7 @@ jobs:
             candidates=( *sysupgrade.tar* )
             test "${#candidates[@]}" = 0
             cd "$GITHUB_WORKSPACE"
-            bash ufi/check-squashfs.sh "$dest"
+            bash ufi/check-squashfs.sh "$dest" "$BOARD"
           fi
           cd "$dest"
           sha256sum *.img *.tar > SHA256SUMS
@@ -151,7 +154,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: image-diagnostics-${{ matrix.board }}-${{ github.run_id }}
+          name: image-diagnostics-${{ matrix.board }}-${{ matrix.filesystem }}-${{ github.run_id }}
           path: |
             bin/targets/msm89xx/msm8916/*.img*
             bin/targets/msm89xx/msm8916/*sysupgrade.tar*
@@ -160,6 +163,6 @@ jobs:
             artifacts/*/apk-compatibility.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.BOARD }}${{ inputs.squashfs && '-squashfs-fastboot' || '' }}-${{ github.sha }}
+          name: ${{ env.BOARD }}${{ matrix.filesystem == 'squashfs' && '-squashfs-fastboot' || '' }}-${{ github.sha }}
           path: artifacts/
           include-hidden-files: true

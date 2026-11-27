@@ -7,7 +7,7 @@ ifeq ($(ufi_profiles),y)
 ufi_pcb := $(if $(CONFIG_TARGET_msm89xx_msm8916_DEVICE_openstick-ufi003),UFI003C_MB_V02,UFI001C_MB_V01)
 ufi_layout := $(if $(CONFIG_TARGET_msm89xx_msm8916_DEVICE_openstick-ufi003),layout-ufi003c-v1,layout-v1)
 ufi_upgrade := platform.sh
-ifeq ($(ufi_pcb):$(CONFIG_TARGET_ROOTFS_SQUASHFS):$(CONFIG_TARGET_ROOTFS_EXT4FS),UFI001C_MB_V01:y:)
+ifeq ($(CONFIG_TARGET_ROOTFS_SQUASHFS):$(CONFIG_TARGET_ROOTFS_EXT4FS),y:)
 ufi_upgrade := platform-fastboot-only.sh
 endif
 # Reinstall the board files when an incremental build switches image format.
