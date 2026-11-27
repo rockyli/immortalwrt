@@ -1,7 +1,7 @@
 name: UFI official APK compatibility
 on:
   push:
-    branches: [ufi-msm8916]
+    branches: [ufi-v25.12.2]
     paths: [.github/workflows/ufi-apk.yml]
   workflow_dispatch:
 permissions:
@@ -12,14 +12,19 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - name: Find the latest successful UFI001C firmware artifact
+      - name: Find the latest available 25.12.2 UFI001C ext4 artifact
         id: firmware
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          artifact=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" |
-            jq -er '[.artifacts[] | select(.expired == false and .workflow_run.head_branch == "ufi-msm8916" and (.name | startswith("UFI001C_MB_V01-")))] | first | select(.)')
+          artifact=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" |
+            jq -cse '[
+              .[].artifacts[]
+              | select(.expired == false and .workflow_run.head_branch == "ufi-v25.12.2")
+              | select(.workflow_run.head_repository_id == .workflow_run.repository_id)
+              | select(.name == ("ufi-25.12.2-UFI001C_MB_V01-" + .workflow_run.head_sha))
+            ] | max_by([.created_at, .id]) // error("No unexpired UFI001C 25.12.2 ext4 artifact found")')
           jq -r '"name=\(.name)\nrun=\(.workflow_run.id)"' <<< "$artifact" >> "$GITHUB_OUTPUT"
           jq '{name,digest,workflow_run}' <<< "$artifact"
       - uses: actions/download-artifact@v4
@@ -33,10 +38,11 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y android-sdk-libsparse-utils qemu-user-static
-          image=$(find firmware -type f -name '*-ext4-system.img' -print -quit)
-          cd "$(dirname "$image")"
+          cd firmware/UFI001C_MB_V01
+          image=immortalwrt-msm89xx-msm8916-openstick-ufi001c-ext4-system.img
+          test -s "$image"
           sha256sum -c SHA256SUMS
-          simg2img *-ext4-system.img "$RUNNER_TEMP/test.ext4"
+          simg2img "$image" "$RUNNER_TEMP/test.ext4"
           root="$RUNNER_TEMP/ufi-root"
           mkdir "$root"
           sudo mount -o loop "$RUNNER_TEMP/test.ext4" "$root"

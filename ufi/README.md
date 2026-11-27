@@ -7,7 +7,7 @@
 | PCB | profile | 镜像状态依据 |
 | --- | --- | --- |
 | UFI001C_MB_V01 | openstick-ufi001c | 6.12.85 的 SquashFS 已验证普通重启保留配置、LuCI 恢复出厂清除配置。25.12.2 需独立实测。 |
-| UFI003C_MB_V02 | openstick-ufi003 | 25.12.2 ext4 提交 `6e581b7252` 已用 Fastboot 首刷，实机确认可写 ext4、6.12.103 及蜂窝联网。25.12.2 SquashFS 需独立实测。 |
+| UFI003C_MB_V02 | openstick-ufi003 | 25.12.2 ext4 提交 `6e581b7252` 已用 Fastboot 首刷，实机确认可写 ext4、6.12.103 及蜂窝联网。SquashFS 提交 `0a8634a148` 已通过首刷、普通重启、LuCI 恢复出厂和蜂窝联网验收。 |
 
 ## 板级改动
 
@@ -24,7 +24,7 @@ git diff --stat a0863614715f843cea107748399b46f4e46df4b1 7fe583d96eabe34efdc2f76
 
 向 `ufi-v25.12.2` 推送会启动独立的 `UFI firmware · 25.12.2 candidate` 工作流，分别构建两块 PCB 的 ext4 和 SquashFS。制品按板型、格式和提交独立归档，包内附 `source.sha`、`SHA256SUMS`、manifest、配置、锁定的 feeds 和验包报告。设备的发行版 revision 沿用官方标签，具体维护提交以制品的 `source.sha` 为准。
 
-同步官方更新时，先从已验收提交建立候选分支，合入选定官方提交，审查上述板级差异，按需要成组更新 feeds。构建、启动、USB 管理、Wi-Fi、蜂窝注册和数据通信逐项记录。单臂旁路脚本作为系统启动后的配置阶段独立验收。
+`master` 跟踪 ImmortalWrt 官方 `master`，本系列的固件改动在 `ufi-v25.12.2` 上维护。采用下一条大版本时，从选定的官方正式标签建立候选分支，移植板级改动并按标签更新 feeds。构建、启动、USB 管理、Wi-Fi、蜂窝注册和数据通信逐项记录。单臂旁路脚本作为系统启动后的配置阶段独立验收。
 
 ## 升级包和软件源
 
@@ -42,6 +42,8 @@ SquashFS 通过 Fastboot 更新。只读系统和 F2FS 可写层共用该板现�
 2. 首次启动核对 PCB、发行版 25.12.2 和内核 6.12.103。运行 `awk '$2=="/rom" || $2=="/overlay" || $2=="/"' /proc/mounts`，应看到只读 SquashFS、可写 loop/F2FS 和合并后的 overlay 根。用 `df -h /overlay` 记录空间。
 3. 创建 `/etc/ufi-reset-test`，普通重启后确认标记仍在。通过 LAN 登录 LuCI「系统 → 备份/升级」执行恢复出厂。重启后确认标记消失、固件版本一致、F2FS 可写层已挂载。恢复出厂会清除密码、SSH 公钥及已安装应用。
 4. 在干净系统上验证 USB 管理、Wi-Fi DHCP、LuCI HTTPS、蜂窝注册、客户端经蜂窝上网、重启自动重连及 `apk update`。两块板分别记录实测结果。
+
+2026-11-27 在 UFI003C_MB_V02 上实测了 [25.12.2 SquashFS 制品 `0a8634a148`](https://github.com/rockyli/immortalwrt/actions/runs/45958867959/artifacts/15183450445)。Fastboot 首刷后启动内核 6.12.103，`/rom` 为只读 SquashFS，`/overlay` 为可写 F2FS，约有 3.2 GiB 可用。普通重启后启动 ID 已变化，标记文件仍在。通过 LuCI 恢复出厂后，标记和管理员密码均已清除，F2FS 可写层重新挂载，管理页面可访问，蜂窝网络正常。PSG 2.4.10 部署另行验收。
 
 ## 两块板的出厂网络配置
 
